@@ -1,3 +1,4 @@
+import React from "react";
 import type { Route } from "./+types/radix-rd";
 import { requireAccess } from "~/lib/auth";
 import {
@@ -5,7 +6,7 @@ import {
   getPersonDetail, getAvailableYears,
   getRateHistory, getAllMonthlyOverridesForYear,
 } from "~/lib/queries";
-import { computeRadixRD, sumField, resolvePersonCosts, aggregateToCategories } from "~/lib/computations";
+import { computeRadixRD, sumField, resolvePersonCosts, aggregateToCategories, MONTHS } from "~/lib/computations";
 import {
   formatCurrencyFull, formatCurrencyAccounting, formatPercent, formatHours, MONTH_LABELS,
 } from "~/lib/formatters";
@@ -101,15 +102,24 @@ export default function RadixRDRoute({ loaderData }: Route.ComponentProps) {
     ],
   };
 
-  const peopleByMonth: Record<string, Record<number, { hours: number; cost: number }>> = {};
+  type MonthMap = Record<number, { hours: number; cost: number }>;
+  const grouped: Record<string, Record<string, Record<string, MonthMap>>> = {};
   for (const r of personRows) {
-    if (!peopleByMonth[r.staff_member]) peopleByMonth[r.staff_member] = {};
-    if (!peopleByMonth[r.staff_member][r.month]) peopleByMonth[r.staff_member][r.month] = { hours: 0, cost: 0 };
-    peopleByMonth[r.staff_member][r.month].hours += r.hours ?? 0;
-    peopleByMonth[r.staff_member][r.month].cost  += r.labor_cost ?? 0;
+    const co = r.company ?? "Unknown"; const dept = r.dept ?? "Unknown"; const name = r.staff_member;
+    if (!grouped[co]) grouped[co] = {};
+    if (!grouped[co][dept]) grouped[co][dept] = {};
+    if (!grouped[co][dept][name]) grouped[co][dept][name] = {};
+    const mm = grouped[co][dept][name];
+    if (!mm[r.month]) mm[r.month] = { hours: 0, cost: 0 };
+    mm[r.month].hours += r.hours ?? 0;
+    mm[r.month].cost  += r.labor_cost ?? 0;
   }
-  const people = Object.keys(peopleByMonth).sort();
-  const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12];
+  const coOrder = ["Radix", ...Object.keys(grouped).filter((c) => c !== "Radix").sort()];
+  const mCost  = (mm: MonthMap, m: number) => mm[m]?.cost ?? 0;
+  const ytdMM  = (mm: MonthMap) => Object.values(mm).reduce((s, v) => s + v.cost, 0);
+  const deptMC = (dd: Record<string, MonthMap>, m: number) => Object.values(dd).reduce((s, mm) => s + mCost(mm, m), 0);
+  const coMC   = (cd: Record<string, Record<string, MonthMap>>, m: number) => Object.values(cd).reduce((s, dd) => s + deptMC(dd, m), 0);
+  const grandMC = (m: number) => coOrder.filter((co) => grouped[co]).reduce((s, co) => s + coMC(grouped[co], m), 0);
 
   return (
     <div className="p-4 space-y-4">
@@ -178,22 +188,52 @@ export default function RadixRDRoute({ loaderData }: Route.ComponentProps) {
               </tr>
             </thead>
             <tbody>
-              {people.map((name, i) => {
-                const row = peopleByMonth[name];
-                const ytd = Object.values(row).reduce((s, v) => s + v.cost, 0);
+              {coOrder.filter((co) => grouped[co]).map((co) => {
+                const coData = grouped[co];
+                const depts  = Object.keys(coData).sort();
+                const coYTD  = depts.reduce((s, d) => s + Object.values(coData[d]).reduce((s2, mm) => s2 + ytdMM(mm), 0), 0);
                 return (
-                  <tr key={name} className={i % 2 === 0 ? "bg-dash-surface" : "bg-dash-surface-raised"}>
-                    <td className="py-1.5 px-3 text-dash-text truncate max-w-[192px]">{name}</td>
-                    {MONTHS.map((m) => (
-                      <td key={m} className="py-1.5 px-2 text-right text-dash-text-secondary">
-                        {row[m]?.cost ? formatCurrencyAccounting(row[m].cost) : "—"}
-                      </td>
-                    ))}
-                    <td className="py-1.5 px-3 text-right font-semibold text-dash-text">{formatCurrencyFull(ytd)}</td>
-                  </tr>
+                  <React.Fragment key={co}>
+                    <tr className="border-t-2 border-dash-border bg-dash-surface-raised">
+                      <td className="py-1.5 px-3 font-semibold text-dash-text">{co}</td>
+                      {MONTHS.map((m) => { const t = coMC(coData, m); return <td key={m} className="py-1.5 px-2 text-right font-semibold font-mono text-dash-text">{t ? formatCurrencyAccounting(t) : "—"}</td>; })}
+                      <td className="py-1.5 px-3 text-right font-semibold font-mono text-dash-text">{formatCurrencyFull(coYTD)}</td>
+                    </tr>
+                    {depts.map((dept) => {
+                      const deptData = coData[dept];
+                      const names = Object.keys(deptData).sort();
+                      const deptYTD = names.reduce((s, n) => s + ytdMM(deptData[n]), 0);
+                      return (
+                        <React.Fragment key={dept}>
+                          <tr className="bg-dash-surface">
+                            <td className="py-1 px-3 pl-7 font-medium text-dash-text-secondary italic">{dept}</td>
+                            {MONTHS.map((m) => { const t = deptMC(deptData, m); return <td key={m} className="py-1 px-2 text-right font-mono text-dash-text-secondary">{t ? formatCurrencyAccounting(t) : "—"}</td>; })}
+                            <td className="py-1 px-3 text-right font-mono text-dash-text-secondary">{formatCurrencyFull(deptYTD)}</td>
+                          </tr>
+                          {names.map((name, i) => {
+                            const mm = deptData[name];
+                            return (
+                              <tr key={name} className={i % 2 === 0 ? "bg-dash-surface" : "bg-dash-surface-raised/30"}>
+                                <td className="py-1.5 px-3 pl-12 text-dash-text-secondary truncate max-w-[192px]">{name}</td>
+                                {MONTHS.map((m) => <td key={m} className="py-1.5 px-2 text-right font-mono text-dash-text-secondary">{mm[m]?.cost ? formatCurrencyAccounting(mm[m].cost) : "—"}</td>)}
+                                <td className="py-1.5 px-3 text-right font-mono text-dash-text-secondary">{formatCurrencyFull(ytdMM(mm))}</td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })}
+                  </React.Fragment>
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-dash-border font-semibold bg-dash-surface-raised">
+                <td className="py-2 px-3 text-dash-text">Grand Total</td>
+                {MONTHS.map((m) => { const t = grandMC(m); return <td key={m} className="py-2 px-2 text-right font-mono text-dash-text">{t ? formatCurrencyAccounting(t) : "—"}</td>; })}
+                <td className="py-2 px-3 text-right font-mono text-dash-text">{formatCurrencyFull(coOrder.filter((co) => grouped[co]).reduce((s, co) => s + Object.values(grouped[co]).reduce((s2, dd) => s2 + Object.values(dd).reduce((s3, mm) => s3 + ytdMM(mm), 0), 0), 0))}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </Section>
