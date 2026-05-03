@@ -160,7 +160,10 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
             { label: "Sub — R&D",     values: monthly.map((m) => m.sub_rd) },
           ]}
           totalRow={{ label: "Subtotal Labor", values: monthly.map((m) => m.subtotal_labor) }}
-          extraRow={{ label: "PR Tax & Bene's %", values: monthly.map((m) => formatPercent(m.tax_bene_rate)), isText: true }}
+          footerRows={[
+            { label: "PR Tax & Bene's %",     values: monthly.map((m) => formatPercent(m.tax_bene_rate)), isText: true },
+            { label: "Payroll Taxes & Benes", values: monthly.map((m) => (m.w2_ops + m.w2_rd + m.w2_ga) * m.tax_bene_rate) },
+          ]}
         />
       </Section>
 
@@ -290,12 +293,12 @@ function MonthlyTable({
   year,
   rows,
   totalRow,
-  extraRow,
+  footerRows,
 }: {
   year: number;
   rows: TableRow[];
   totalRow?: TableRow;
-  extraRow?: TableRow & { isText?: boolean };
+  footerRows?: (TableRow & { isText?: boolean })[];
 }) {
   const ytdCalc = (vals: (number | string)[]) =>
     vals.reduce((s, v) => s + (typeof v === "number" ? v : 0), 0);
@@ -328,15 +331,6 @@ function MonthlyTable({
               </td>
             </tr>
           ))}
-          {extraRow && (
-            <tr className="border-t border-dash-border-divider">
-              <td className="py-1.5 px-3 text-dash-text-muted italic">{extraRow.label}</td>
-              {extraRow.values.map((v, j) => (
-                <td key={j} className="py-1.5 px-2 text-right font-mono text-dash-text-muted">{String(v)}</td>
-              ))}
-              <td />
-            </tr>
-          )}
           {totalRow && (
             <tr className="border-t border-dash-border font-semibold">
               <td className="py-2 px-3 text-dash-text">{totalRow.label}</td>
@@ -350,6 +344,19 @@ function MonthlyTable({
               </td>
             </tr>
           )}
+          {footerRows?.map((row, i) => (
+            <tr key={i} className="border-t border-dash-border-divider">
+              <td className="py-1.5 px-3 text-dash-text-muted italic">{row.label}</td>
+              {row.values.map((v, j) => (
+                <td key={j} className="py-1.5 px-2 text-right font-mono text-dash-text-muted">
+                  {row.isText ? String(v) : formatCurrencyAccounting(typeof v === "number" ? v : 0)}
+                </td>
+              ))}
+              <td className="py-1.5 px-3 text-right font-mono text-dash-text-muted">
+                {row.isText ? "" : formatCurrencyFull(ytdCalc(row.values))}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
