@@ -181,10 +181,12 @@ def batch_insert_local(rows: list[dict]) -> None:
 # ── CSV import ────────────────────────────────────────────────────────────────
 
 def import_csv(path: str, remote: bool, year_filter: int | None) -> None:
-    rows: list[dict] = []
-    seen: set[tuple] = set()  # dedup key: (staff_member, date, project, hours)
+    from collections import Counter
     skipped = 0
-    dupes = 0
+
+    # First pass: collect all valid parsed rows
+    parsed: list[dict] = []
+    key_counts: Counter = Counter()
 
     with open(path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
@@ -211,16 +213,11 @@ def import_csv(path: str, remote: bool, year_filter: int | None) -> None:
             if year_filter and year != year_filter:
                 continue
 
-            # Skip exact duplicate rows (BigTime exports each entry twice)
-            dedup_key = (staff_member, iso_date, project, hours, notes or "")
-            if dedup_key in seen:
-                dupes += 1
-                continue
-            seen.add(dedup_key)
-
             nc_mapped = classify_nc(project, nc_original)
+            dedup_key = (staff_member, iso_date, project, hours, notes or "")
+            key_counts[dedup_key] += 1
 
-            rows.append({
+            parsed.append({
                 "project":      project,
                 "staff_member": staff_member,
                 "date":         iso_date,
@@ -235,6 +232,22 @@ def import_csv(path: str, remote: bool, year_filter: int | None) -> None:
                 "dept":         dept,
                 "vendor":       vendor,
             })
+
+    # Second pass: BigTime exports each entry exactly twice, so keep count//2 of each key.
+    # This handles both the simple case (2 identical rows → keep 1) and the case where
+    # multiple legitimate entries share the same key (e.g. 6 identical rows → keep 3).
+    keep = {k: v // 2 for k, v in key_counts.items()}
+    seen_counts: Counter = Counter()
+    rows: list[dict] = []
+    dupes = 0
+
+    for row in parsed:
+        key = (row["staff_member"], row["date"], row["project"], row["hours"], row["notes"] or "")
+        seen_counts[key] += 1
+        if seen_counts[key] <= keep[key]:
+            rows.append(row)
+        else:
+            dupes += 1
 
     print(f"Parsed {len(rows)} rows ({skipped} skipped, {dupes} duplicates removed).")
 
