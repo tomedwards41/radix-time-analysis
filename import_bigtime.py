@@ -39,7 +39,6 @@ NC_RULES: list[tuple[str, str]] = [
     ("Radix R&D - Telco. | Radix R&D - Telco.:Radix R&D - Telco.",                                                                  "R&D"),
     ("Mango Core | Mango Core:Mango Core",                                                                                           "R&D"),
     ("enCompass | Compass Datacenters:enCompass",                                                                                    "Enc R&D"),
-    ("CenterSquare errProof Implementation | Centersquare Data Centers:CenterSquare errProof Implementation",                        "Enc R&D"),
     ("enCompass Platform | Compass Datacenters:enCompass Platform",                                                                  "Enc R&D"),
     ("Radix - Overhead Costs | Radix - Overhead Costs:Radix - Overhead Costs",                                                      "OH"),
 ]
@@ -183,7 +182,9 @@ def batch_insert_local(rows: list[dict]) -> None:
 
 def import_csv(path: str, remote: bool, year_filter: int | None) -> None:
     rows: list[dict] = []
+    seen: set[tuple] = set()  # dedup key: (staff_member, date, project, hours)
     skipped = 0
+    dupes = 0
 
     with open(path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
@@ -210,6 +211,13 @@ def import_csv(path: str, remote: bool, year_filter: int | None) -> None:
             if year_filter and year != year_filter:
                 continue
 
+            # Skip exact duplicate rows (BigTime exports each entry twice)
+            dedup_key = (staff_member, iso_date, project, hours, notes or "")
+            if dedup_key in seen:
+                dupes += 1
+                continue
+            seen.add(dedup_key)
+
             nc_mapped = classify_nc(project, nc_original)
 
             rows.append({
@@ -228,7 +236,7 @@ def import_csv(path: str, remote: bool, year_filter: int | None) -> None:
                 "vendor":       vendor,
             })
 
-    print(f"Parsed {len(rows)} rows ({skipped} skipped).")
+    print(f"Parsed {len(rows)} rows ({skipped} skipped, {dupes} duplicates removed).")
 
     if remote:
         print("Inserting into remote D1...")
