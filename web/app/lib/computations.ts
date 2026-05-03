@@ -59,8 +59,10 @@ export function resolvePersonCosts(
         o.nc_bucket === ncBucket
     );
 
+    const isInPrimaryBucket =
+      person.primary_nc_bucket != null && person.primary_nc_bucket === ncBucket;
     const useFullMonth =
-      override != null ? override.use_monthly_rate === 1 : person.default_alloc === "100%";
+      override != null ? override.use_monthly_rate === 1 : (person.default_alloc === "100%" && isInPrimaryBucket);
 
     const hourlyRate = getRateForMonth(rateHistory, row.staff_member, row.year, row.month)
       ?? person.hourly_rate
