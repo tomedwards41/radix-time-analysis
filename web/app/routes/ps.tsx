@@ -193,6 +193,22 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-dash-border font-semibold bg-dash-surface-raised">
+                <td className="py-2 px-3 text-dash-text">Total</td>
+                {MONTHS.map((m) => {
+                  const total = people.reduce((s, name) => s + (peopleByMonth[name][m]?.cost ?? 0), 0);
+                  return (
+                    <td key={m} className="py-2 px-2 text-right text-dash-text">
+                      {total ? formatCurrencyAccounting(total) : "—"}
+                    </td>
+                  );
+                })}
+                <td className="py-2 px-3 text-right text-dash-text">
+                  {formatCurrencyFull(people.reduce((s, name) => s + Object.values(peopleByMonth[name]).reduce((a, v) => a + v.cost, 0), 0))}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </Section>
