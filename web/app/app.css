@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;600&family=Poppins:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* --- Surfaces --- */
+  --color-dash-bg: #141617;
+  --color-dash-surface: #1C1F21;
+  --color-dash-surface-raised: #242729;
+  --color-dash-surface-sunken: #0F1112;
+  --color-dash-nav-bg: #111314;
+
+  /* --- Borders --- */
+  --color-dash-border: rgba(255, 255, 255, 0.08);
+  --color-dash-border-strong: rgba(255, 255, 255, 0.14);
+  --color-dash-border-divider: rgba(255, 255, 255, 0.05);
+
+  /* --- Text --- */
+  --color-dash-text: #E8EDF2;
+  --color-dash-text-secondary: #94A3B8;
+  --color-dash-text-muted: #64748B;
+  --color-dash-text-on-accent: #141617;
+
+  /* --- Brand Accent --- */
+  --color-dash-accent: #A1CE5E;
+  --color-dash-accent-hover: #B5D97A;
+  --color-dash-accent-muted: #7AAB32;
+  --color-dash-accent-subtle: rgba(161, 206, 94, 0.10);
+
+  /* --- Semantic --- */
+  --color-dash-positive: #6AAA8E;
+  --color-dash-positive-bg: rgba(106, 170, 142, 0.12);
+  --color-dash-negative: #C47A7A;
+  --color-dash-negative-bg: rgba(196, 122, 122, 0.12);
+  --color-dash-warning: #C9A96E;
+  --color-dash-warning-bg: rgba(201, 169, 110, 0.12);
+  --color-dash-info: #5B9BD5;
+  --color-dash-info-bg: rgba(91, 155, 213, 0.12);
+
+  /* --- Chart Palette --- */
+  --color-chart-1: #A1CE5E;
+  --color-chart-2: #5B9BD5;
+  --color-chart-3: #C9A96E;
+  --color-chart-4: #C47A7A;
+  --color-chart-5: #7AAB32;
+  --color-chart-6: #8B5CF6;
+  --color-chart-7: #ED7D31;
+  --color-chart-8: #6AAA8E;
+
+  /* --- Fonts --- */
+  --font-heading: 'Montserrat', system-ui, sans-serif;
+  --font-body: 'Source Sans 3', system-ui, sans-serif;
+  --font-ui: 'Poppins', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* --- Spacing --- */
+  --spacing-page: 16px;
+  --spacing-section: 12px;
+  --spacing-card: 10px;
+  --spacing-kpi: 9px;
+}
+
+body {
+  background: var(--color-dash-bg);
+  color: var(--color-dash-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding: var(--spacing-page);
+}

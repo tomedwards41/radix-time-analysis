@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "radix-labor-web",
+  "compatibility_date": "2025-04-04",
+  "main": "./workers/app.ts",
+  "routes": [
+    { "pattern": "dashboard.radixiot.work/labor/*", "zone_name": "radixiot.work" }
+  ],
+  "d1_databases": [
+    { "binding": "DB",   "database_name": "radix_accounting",  "database_id": "f676a4b3-c78f-43c2-b2e7-751251886910" },
+    { "binding": "AUTH", "database_name": "radix-auth",   "database_id": "80a59fd9-495a-435f-8eb9-0b61af50d737" }
+  ]
+}

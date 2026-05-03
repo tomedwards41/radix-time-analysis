@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Labor Analysis — Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Source+Sans+3:wght@300;400;600;700&family=Poppins:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" />
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root {
+    --bg:           #141617;
+    --surface:      #1C1F21;
+    --surface-r:    #242729;
+    --surface-s:    #0F1112;
+    --nav-bg:       #111314;
+    --border:       rgba(255,255,255,0.08);
+    --border-s:     rgba(255,255,255,0.05);
+    --text:         #E8EDF2;
+    --text-sec:     #94A3B8;
+    --text-muted:   #64748B;
+    --accent:       #A1CE5E;
+    --accent-m:     #7AAB32;
+    --accent-sub:   rgba(161,206,94,0.10);
+    --positive:     #6AAA8E;
+    --negative:     #C47A7A;
+    --warning:      #C9A96E;
+    --info:         #5B9BD5;
+    --font-h:       'Montserrat', sans-serif;
+    --font-b:       'Source Sans 3', sans-serif;
+    --font-ui:      'Poppins', sans-serif;
+    --font-mono:    'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-b); font-size: 13px; line-height: 1.6; padding: 16px; -webkit-font-smoothing: antialiased; }
+
+  /* Nav */
+  nav { display: flex; align-items: center; background: var(--nav-bg); border: 1px solid var(--border); border-radius: 8px; padding: 0 14px; height: 48px; gap: 6px; margin-bottom: 12px; }
+  .nav-logo { color: var(--accent); }
+  .nav-logo svg { width: 20px; height: 20px; }
+  .nav-div { width: 1px; height: 20px; background: var(--border); margin: 0 8px; }
+  .nav-brand { font-family: var(--font-h); font-size: 13px; font-weight: 700; color: var(--text-sec); margin-right: 10px; }
+  .nav-tab { font-family: var(--font-ui); font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 14px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; color: var(--text-muted); transition: all 0.15s; text-decoration: none; }
+  .nav-tab:hover { background: var(--surface-r); color: var(--text); border-color: var(--border); }
+  .nav-tab.active { background: var(--surface); color: var(--accent); border-color: var(--accent-m); }
+
+  /* Page */
+  .page { display: none; padding: 4px 0; }
+  .page.active { display: block; }
+
+  h1 { font-family: var(--font-h); font-size: 17px; font-weight: 600; color: var(--text); }
+  .subtitle { font-family: var(--font-ui); font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* KPI row */
+  .kpi-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; flex: 1; min-width: 140px; transition: all 0.2s; cursor: default; }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.20); }
+  .kpi-label { font-family: var(--font-ui); font-size: 10px; font-weight: 500; color: var(--text-sec); text-transform: uppercase; letter-spacing: 0.12em; }
+  .kpi-value { font-family: var(--font-h); font-size: 22px; font-weight: 600; color: var(--text); margin-top: 3px; }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Chart */
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .chart-card div[id] { width: 100%; height: 240px; }
+
+  /* Section */
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .section-header { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .section-title { font-family: var(--font-ui); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-sec); }
+  .section-body { padding: 12px; overflow-x: auto; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { font-family: var(--font-ui); font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child { text-align: left; padding-left: 12px; min-width: 180px; }
+  td { padding: 6px 8px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--text-sec); white-space: nowrap; }
+  td:first-child { text-align: left; font-family: var(--font-b); font-size: 12px; color: var(--text-sec); padding-left: 12px; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .row-bold td { color: var(--text); font-weight: 600; }
+  .row-bold td:first-child { font-family: var(--font-b); }
+  .row-total td { border-top: 1px solid var(--border); color: var(--text); font-weight: 600; }
+  .row-muted td { color: var(--text-muted); font-style: italic; }
+  .row-credit td { color: var(--negative); }
+  .row-debit td:nth-child(n+2) { color: var(--positive); }
+  td.ytd { color: var(--text); font-weight: 600; padding-right: 12px; }
+  th.ytd { padding-right: 12px; }
+
+  /* Two-col grid */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* Badge */
+  .badge { display: inline-flex; align-items: center; border-radius: 4px; padding: 2px 6px; font-family: var(--font-ui); font-size: 10px; font-weight: 500; }
+  .badge-green  { background: rgba(106,170,142,0.12); color: var(--positive); outline: 1px solid rgba(106,170,142,0.3); }
+  .badge-blue   { background: rgba(91,155,213,0.12);  color: var(--info);     outline: 1px solid rgba(91,155,213,0.3); }
+  .badge-purple { background: rgba(139,92,246,0.12);  color: #a78bfa;         outline: 1px solid rgba(139,92,246,0.3); }
+  .badge-gray   { background: rgba(255,255,255,0.05); color: var(--text-muted); outline: 1px solid rgba(255,255,255,0.10); }
+
+  /* Upload page */
+  .step-row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .step-num { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-sub); color: var(--accent); font-family: var(--font-ui); font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .step-title { font-family: var(--font-ui); font-weight: 500; color: var(--text); font-size: 12px; }
+  .step-body { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+  pre.code { background: var(--surface-s); border-radius: 6px; padding: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--text-sec); overflow-x: auto; margin-top: 6px; }
+  code { font-family: var(--font-mono); font-size: 11px; color: var(--accent); }
+
+  /* Intercompany highlight */
+  .interco-row td { background: rgba(161,206,94,0.06); color: var(--accent); font-weight: 600; }
+  .interco-row td:first-child { color: var(--accent); }
+
+  /* Override panel */
+  .override-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .override-controls label { font-family: var(--font-ui); font-size: 11px; color: var(--text-muted); }
+  .override-controls select { background: var(--surface-r); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: 11px; color: var(--text); font-family: var(--font-ui); }
+  .override-save-btn { background: var(--accent); border: none; border-radius: 4px; padding: 5px 14px; font-size: 11px; font-family: var(--font-ui); font-weight: 600; color: #111; cursor: pointer; }
+  .override-save-btn:hover { opacity: 0.9; }
+  .override-note { font-size: 11px; color: var(--text-muted); }
+  .override-table td:first-child { text-align: center; padding: 6px 8px; width: 32px; }
+  .override-table th:first-child { text-align: center; min-width: 32px; padding: 6px 8px; }
+  .override-table td:nth-child(2) { text-align: left; font-family: var(--font-mono); font-size: 11px; padding-left: 8px; }
+  .override-table td:nth-child(3),
+  .override-table td:nth-child(4) { text-align: left; font-family: var(--font-b); font-size: 12px; }
+  input[type=checkbox].override-cb { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+  </a>
+  <div class="nav-div"></div>
+  <span class="nav-brand">LABOR ANALYSIS</span>
+  <a class="nav-tab active" onclick="show('ps',this)">Professional Services</a>
+  <a class="nav-tab" onclick="show('rd',this)">Radix R&amp;D</a>
+  <a class="nav-tab" onclick="show('enc',this)">enCompass R&amp;D</a>
+  <a class="nav-tab" onclick="show('upload',this)">Data Import</a>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════ PS PAGE -->
+<div class="page active" id="page-ps">
+  <h1>Radix Professional Services</h1>
+  <p class="subtitle">Cost of Sales — 2026 &nbsp;·&nbsp; YTD through Feb</p>
+
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">YTD COS</div><div class="kpi-value">$982K</div></div>
+    <div class="kpi-card"><div class="kpi-label">YTD W-2 Labor</div><div class="kpi-value">$860K</div><div class="kpi-sub">incl. taxes &amp; benes</div></div>
+    <div class="kpi-card"><div class="kpi-label">YTD Subs</div><div class="kpi-value">$122K</div></div>
+    <div class="kpi-card"><div class="kpi-label">YTD Hours</div><div class="kpi-value">4,772</div><div class="kpi-sub">chargeable</div></div>
+  </div>
+
+  <div class="chart-card"><div id="chart-ps"></div></div>
+
+  <div class="two-col">
+    <div class="section">
+      <div class="section-header"><div class="section-title">Labor Costs (excl. taxes / benes)</div></div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th></th><th>Jan-26</th><th>Feb-26</th><th>Mar–Dec</th><th class="ytd">YTD</th></tr></thead>
+          <tbody>
+            <tr><td>W-2 — Ops</td><td>$162,230</td><td>$161,184</td><td>—</td><td class="ytd">$323,415</td></tr>
+            <tr><td>W-2 — R&amp;D</td><td>$830</td><td>$14,939</td><td>—</td><td class="ytd">$15,769</td></tr>
+            <tr><td>W-2 — G&amp;A</td><td>—</td><td>—</td><td>—</td><td class="ytd">—</td></tr>
+            <tr><td>Sub — Ops</td><td>$12,705</td><td>$14,197</td><td>—</td><td class="ytd">$26,902</td></tr>
+            <tr><td>Sub — R&amp;D</td><td>$36,168</td><td>$58,229</td><td>—</td><td class="ytd">$94,397</td></tr>
+            <tr class="row-total"><td>Subtotal Labor</td><td>$211,934</td><td>$248,549</td><td>—</td><td class="ytd">$460,483</td></tr>
+            <tr class="row-muted"><td>PR Tax &amp; Bene's %</td><td>30.0%</td><td>24.0%</td><td>…</td><td class="ytd"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><div class="section-title">Journal Entry (incl. taxes &amp; benes)</div></div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th></th><th>Jan-26</th><th>Feb-26</th><th class="ytd">YTD</th></tr></thead>
+          <tbody>
+            <tr class="row-bold row-debit"><td>DR Cost of Labor — COS</td><td>$211,979</td><td>$218,393</td><td class="ytd">$430,372</td></tr>
+            <tr class="row-bold row-debit"><td>DR Subcontractors — COS</td><td>$48,874</td><td>$72,426</td><td class="ytd">$121,300</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR Ops Compensation</td><td>($210,899)</td><td>($199,869)</td><td class="ytd">($410,768)</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Compensation</td><td>($1,079)</td><td>($18,524)</td><td class="ytd">($19,603)</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR Ops Subcontractors</td><td>($12,705)</td><td>($14,197)</td><td class="ytd">($26,902)</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Subcontractors</td><td>($36,168)</td><td>($58,229)</td><td class="ytd">($94,397)</td></tr>
+            <tr class="row-total"><td>Net (check)</td><td>$—</td><td>$—</td><td class="ytd">$—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><div class="section-title">Detail by Staff Member — Cost ($)</div></div>
+    <div class="section-body">
+      <table>
+        <thead><tr><th>Name</th><th>Jan-26</th><th>Feb-26</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th><th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th><th class="ytd">YTD</th></tr></thead>
+        <tbody>
+          <tr class="row-bold"><td>— Radix W-2 —</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="ytd"></td></tr>
+          <tr><td>Adam Williams</td><td>$11,792</td><td>$11,607</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="ytd">$23,399</td></tr>
+          <tr><td>Allen Leemann</td><td>$9,177</td><td>$9,238</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="ytd">$18,415</td></tr>
+          <tr><td>Chris Bell</td><td>$14,347</td><td>$12,700</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="ytd">$27,047</td></tr>
+          <tr><td>Dave Schaible</td><td>$15,336</td><td>$13,426</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="ytd">$28,762</td></tr>
+          <tr><td>Paul Castaldi</td><td>$16,971</td><td>$14,615</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="ytd">$31,586</td></tr>
+          <tr class="row-bold"><td>— Contractors —</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="ytd"></td></tr>
+          <tr><td>Jeremy Asbra</td><td>$6,678</td><td>$7,979</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="ytd">$14,657</td></tr>
+          <tr><td>Jhonny Martinez</td><td>$6,028</td><td>$6,219</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="ytd">$12,247</td></tr>
+          <tr class="row-total"><td>TOTAL</td><td>$260,852</td><td>$290,819</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="ytd">$551,671</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ R&D PAGE -->
+<div class="page" id="page-rd">
+  <h1>Radix R&amp;D</h1>
+  <p class="subtitle">Construction in Process — 2026 &nbsp;·&nbsp; YTD through Feb</p>
+
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">YTD CIP</div><div class="kpi-value">$493K</div></div>
+    <div class="kpi-card"><div class="kpi-label">YTD W-2 R&amp;D</div><div class="kpi-value">$177K</div><div class="kpi-sub">incl. taxes &amp; benes</div></div>
+    <div class="kpi-card"><div class="kpi-label">YTD Vendors</div><div class="kpi-value">$21K</div><div class="kpi-sub">Innoscale + Power BI</div></div>
+    <div class="kpi-card"><div class="kpi-label">YTD Hours</div><div class="kpi-value">3,463</div><div class="kpi-sub">R&amp;D allocated</div></div>
+  </div>
+
+  <div class="chart-card"><div id="chart-rd"></div></div>
+
+  <div class="two-col">
+    <div class="section">
+      <div class="section-header"><div class="section-title">Labor Costs (excl. taxes / benes)</div></div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th></th><th>Jan-26</th><th>Feb-26</th><th class="ytd">YTD</th></tr></thead>
+          <tbody>
+            <tr><td>W-2 — R&amp;D</td><td>$67,754</td><td>$71,798</td><td class="ytd">$139,552</td></tr>
+            <tr><td>Sub — R&amp;D</td><td>$32,550</td><td>$27,495</td><td class="ytd">$60,045</td></tr>
+            <tr><td>Sub — 3Pillar</td><td>$15,176</td><td>$39,427</td><td class="ytd">$54,603</td></tr>
+            <tr class="row-total"><td>Subtotal Labor</td><td>$115,480</td><td>$120,935</td><td class="ytd">$236,415</td></tr>
+            <tr class="row-muted"><td>PR Tax &amp; Bene's %</td><td>30.0%</td><td>24.0%</td><td class="ytd"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><div class="section-title">Vendors</div></div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th></th><th>Jan-26</th><th>Feb-26</th><th class="ytd">YTD</th></tr></thead>
+          <tbody>
+            <tr><td>Innoscale</td><td>$6,055</td><td>$6,055</td><td class="ytd">$12,110</td></tr>
+            <tr><td>Power BI</td><td>$4,250</td><td>$4,250</td><td class="ytd">$8,500</td></tr>
+            <tr class="row-total"><td>Subtotal</td><td>$10,305</td><td>$10,305</td><td class="ytd">$20,610</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><div class="section-title">Journal Entry (incl. taxes &amp; benes)</div></div>
+    <div class="section-body">
+      <table>
+        <thead><tr><th></th><th>Jan-26</th><th>Feb-26</th><th class="ytd">YTD</th></tr></thead>
+        <tbody>
+          <tr class="row-bold row-debit"><td>DR Construction in Process</td><td>$146,111</td><td>$166,258</td><td class="ytd">$312,369</td></tr>
+          <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Compensation</td><td>($88,080)</td><td>($89,030)</td><td class="ytd">($177,110)</td></tr>
+          <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Subcontractors</td><td>($32,550)</td><td>($27,495)</td><td class="ytd">($60,045)</td></tr>
+          <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Subs — 3Pillar</td><td>($15,176)</td><td>($39,427)</td><td class="ytd">($54,603)</td></tr>
+          <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Subs — Innoscale</td><td>($6,055)</td><td>($6,055)</td><td class="ytd">($12,110)</td></tr>
+          <tr class="row-credit"><td>&nbsp;&nbsp;CR G&amp;A Software — BI Reports</td><td>($4,250)</td><td>($4,250)</td><td class="ytd">($8,500)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ ENC R&D PAGE -->
+<div class="page" id="page-enc">
+  <h1>enCompass Ops R&amp;D</h1>
+  <p class="subtitle">Construction in Process + Intercompany Invoice — 2026 &nbsp;·&nbsp; YTD through Feb</p>
+
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">YTD CIP</div><div class="kpi-value">$475K</div></div>
+    <div class="kpi-card"><div class="kpi-label">YTD Intercompany</div><div class="kpi-value">$547K</div><div class="kpi-sub">CIP × 1.15 markup</div></div>
+    <div class="kpi-card"><div class="kpi-label">YTD W-2 Labor</div><div class="kpi-value">$44K</div><div class="kpi-sub">incl. taxes &amp; benes</div></div>
+    <div class="kpi-card"><div class="kpi-label">YTD Hours</div><div class="kpi-value">7,049</div><div class="kpi-sub">Enc R&amp;D allocated</div></div>
+  </div>
+
+  <div class="chart-card"><div id="chart-enc"></div></div>
+
+  <div class="two-col">
+    <div class="section">
+      <div class="section-header"><div class="section-title">Labor Sources (incl. benes &amp; taxes)</div></div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th></th><th>Jan-26</th><th>Feb-26</th><th class="ytd">YTD</th></tr></thead>
+          <tbody>
+            <tr><td>R&amp;D Labor (incl taxes / benes)</td><td>$21,319</td><td>$22,994</td><td class="ytd">$44,313</td></tr>
+            <tr><td>R&amp;D Contractors</td><td>$43,473</td><td>$41,797</td><td class="ytd">$85,270</td></tr>
+            <tr><td>R&amp;D Subs — 3Pillar</td><td>$115,428</td><td>$115,428</td><td class="ytd">$230,856</td></tr>
+            <tr><td>R&amp;D Subs — Testing Xperts</td><td>$47,319</td><td>$47,319</td><td class="ytd">$94,638</td></tr>
+            <tr class="row-total"><td>Subtotal Labor</td><td>$227,539</td><td>$227,538</td><td class="ytd">$455,077</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header"><div class="section-title">Journal Entry (incl. taxes &amp; benes)</div></div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th></th><th>Jan-26</th><th>Feb-26</th><th class="ytd">YTD</th></tr></thead>
+          <tbody>
+            <tr class="row-bold row-debit"><td>DR Construction in Process</td><td>$237,844</td><td>$237,842</td><td class="ytd">$475,686</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Labor</td><td>($21,319)</td><td>($22,994)</td><td class="ytd">($44,313)</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Subs</td><td>($43,473)</td><td>($41,797)</td><td class="ytd">($85,270)</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Subs — 3Pillar</td><td>($115,428)</td><td>($115,428)</td><td class="ytd">($230,856)</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Subs — Testing Xperts</td><td>($47,319)</td><td>($47,319)</td><td class="ytd">($94,638)</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Subs — Innoscale</td><td>($6,055)</td><td>($6,055)</td><td class="ytd">($12,110)</td></tr>
+            <tr class="row-credit"><td>&nbsp;&nbsp;CR R&amp;D Software — BI Reports</td><td>($4,250)</td><td>($4,250)</td><td class="ytd">($8,500)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><div class="section-title">Intercompany Invoice (15% Markup)</div></div>
+    <div class="section-body">
+      <table>
+        <thead><tr><th></th><th>Jan-26</th><th>Feb-26</th><th>Mar</th><th>Apr</th><th>May</th><th>Jun</th><th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th><th class="ytd">YTD</th></tr></thead>
+        <tbody>
+          <tr class="interco-row"><td>Billing Amount (CIP × 1.15)</td><td>$273,520</td><td>$273,519</td><td>$11,850</td><td>$11,850</td><td>$11,850</td><td>$11,850</td><td>$11,850</td><td>$11,850</td><td>$11,850</td><td>$11,850</td><td>$11,850</td><td>$11,850</td><td class="ytd">$665,544</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><div class="section-title">Detail by Staff Member — Cost ($)</div></div>
+    <div class="section-body">
+      <table>
+        <thead><tr><th>Name</th><th>Jan-26</th><th>Feb-26</th><th>Mar–Dec</th><th class="ytd">YTD</th></tr></thead>
+        <tbody>
+          <tr class="row-bold"><td>— Radix W-2 —</td><td></td><td></td><td></td><td class="ytd"></td></tr>
+          <tr><td>Aidan Christie</td><td>$5,510</td><td>$5,480</td><td>—</td><td class="ytd">$10,990</td></tr>
+          <tr><td>Greg Christie</td><td>$6,309</td><td>$13,176</td><td>—</td><td class="ytd">$19,485</td></tr>
+          <tr class="row-bold"><td>— Contractors —</td><td></td><td></td><td></td><td class="ytd"></td></tr>
+          <tr><td>Javier Trevino</td><td>$14,170</td><td>$14,170</td><td>—</td><td class="ytd">$28,340</td></tr>
+          <tr><td>Yuliana Morales</td><td>$10,461</td><td>$10,461</td><td>—</td><td class="ytd">$20,922</td></tr>
+          <tr class="row-bold"><td>— 3Pillar —</td><td></td><td></td><td></td><td class="ytd"></td></tr>
+          <tr><td>Daniel Esquivel</td><td>$13,230</td><td>$13,230</td><td>—</td><td class="ytd">$26,460</td></tr>
+          <tr><td>Jose Guzman</td><td>$13,230</td><td>$13,230</td><td>—</td><td class="ytd">$26,460</td></tr>
+          <tr class="row-total"><td>TOTAL</td><td>$227,539</td><td>$226,751</td><td>—</td><td class="ytd">$454,290</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ UPLOAD PAGE -->
+<div class="page" id="page-upload">
+  <h1>Data Import</h1>
+  <p class="subtitle">Import BigTime CSV exports · data stored in Cloudflare D1</p>
+
+  <div class="kpi-row">
+    <div class="kpi-card"><div class="kpi-label">Total Rows</div><div class="kpi-value">48,291</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Hours</div><div class="kpi-value">127,440</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Cost</div><div class="kpi-value">$14.2M</div></div>
+    <div class="kpi-card"><div class="kpi-label">Years on File</div><div class="kpi-value">2024–26</div></div>
+  </div>
+
+  <div class="section" style="margin-bottom:12px">
+    <div class="section-header"><div class="section-title">How to Import</div></div>
+    <div class="section-body" style="padding:16px">
+      <div class="step-row">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Export from BigTime</div>
+          <div class="step-body">Go to BigTime → Reports → Time Reports. Export as CSV. Required columns: <code>Project, Staff Member, Date, Input, N/C, Notes, Labor Rate, Labor Cost</code></div>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Run the import script</div>
+          <pre class="code"># Local D1 (development)
+python import_bigtime.py path/to/export.csv --year 2026
+
+# Remote Cloudflare D1 (production)
+python import_bigtime.py path/to/export.csv --year 2026 --remote</pre>
+          <div class="step-body" style="margin-top:6px">The script automatically applies the N/C reclassification rules and matches staff against the roster.</div>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Import roster (first time or when rates change)</div>
+          <pre class="code">python import_bigtime.py --roster "3.2026 Labor Analysis - PS & R&D.xlsx" --remote</pre>
+        </div>
+      </div>
+      <div class="step-row" style="margin-bottom:0">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">Verify</div>
+          <div class="step-body">The table below updates automatically after each import.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" style="margin-bottom:12px">
+    <div class="section-header"><div class="section-title">Monthly Allocation Overrides — enCompass R&amp;D</div></div>
+    <div class="section-body" style="padding:16px">
+      <p style="font-size:12px;color:var(--text-sec);margin-bottom:14px">
+        These people default to <strong style="color:var(--text)">100% monthly rate</strong> regardless of BigTime hours.
+        Uncheck anyone who should use actual BigTime hours for this month (e.g., hired mid-month, partial month).
+      </p>
+      <div class="override-controls">
+        <label>Period:</label>
+        <select><option>2026</option></select>
+        <select>
+          <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option>
+          <option selected>May</option><option>Jun</option><option>Jul</option><option>Aug</option>
+          <option>Sep</option><option>Oct</option><option>Nov</option><option>Dec</option>
+        </select>
+        <button class="override-save-btn" onclick="alert('In the live app, this loads saved overrides for the selected month.')">Load</button>
+      </div>
+      <table class="override-table" style="margin-bottom:14px">
+        <thead>
+          <tr>
+            <th style="text-align:center">100%</th>
+            <th style="text-align:left;padding-left:8px">Name</th>
+            <th style="text-align:left">Company</th>
+            <th style="text-align:left">Category</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><input type="checkbox" class="override-cb" checked></td><td>Aakash Srivastava</td><td style="color:var(--text-sec)">3Pillar</td><td><span class="badge badge-blue">Sub - 3Pillar</span></td></tr>
+          <tr><td><input type="checkbox" class="override-cb" checked></td><td>Ankit Sharma</td><td style="color:var(--text-sec)">3Pillar</td><td><span class="badge badge-blue">Sub - 3Pillar</span></td></tr>
+          <tr><td><input type="checkbox" class="override-cb" checked></td><td>Deepak Verma</td><td style="color:var(--text-sec)">3Pillar</td><td><span class="badge badge-blue">Sub - 3Pillar</span></td></tr>
+          <tr><td><input type="checkbox" class="override-cb" checked></td><td>Priya Mehta</td><td style="color:var(--text-sec)">3Pillar</td><td><span class="badge badge-blue">Sub - 3Pillar</span></td></tr>
+          <tr><td><input type="checkbox" class="override-cb" checked></td><td>Rahul Gupta</td><td style="color:var(--text-sec)">3Pillar</td><td><span class="badge badge-blue">Sub - 3Pillar</span></td></tr>
+          <tr><td><input type="checkbox" class="override-cb"></td><td style="color:var(--text-muted)">Vikram Singh <em style="font-size:10px">(hired 5/12)</em></td><td style="color:var(--text-sec)">3Pillar</td><td><span class="badge badge-blue">Sub - 3Pillar</span></td></tr>
+          <tr><td><input type="checkbox" class="override-cb" checked></td><td>Lisa Chen</td><td style="color:var(--text-sec)">Testing Xperts</td><td><span class="badge badge-purple">Sub - Testing</span></td></tr>
+          <tr><td><input type="checkbox" class="override-cb" checked></td><td>Marcus Webb</td><td style="color:var(--text-sec)">Testing Xperts</td><td><span class="badge badge-purple">Sub - Testing</span></td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <button class="override-save-btn" onclick="alert('Overrides saved! The R&D views will now use the correct rates.')">Save Overrides for May-26</button>
+        <span class="override-note">Checked = fixed monthly rate &nbsp;·&nbsp; Unchecked = actual BigTime hours</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" style="margin-bottom:12px">
+    <div class="section-header"><div class="section-title">N/C Classification Rules</div></div>
+    <div class="section-body">
+      <table>
+        <thead><tr><th style="text-align:left">Project (exact match)</th><th style="text-align:right;padding-right:12px">Bucket</th></tr></thead>
+        <tbody>
+          <tr><td style="font-family:var(--font-mono);font-size:10px">Radix - Research and Development Project | …</td><td style="text-align:right;padding-right:12px"><span class="badge badge-blue">R&D</span></td></tr>
+          <tr><td style="font-family:var(--font-mono);font-size:10px">Radix R&amp;D - Telco. | …</td><td style="text-align:right;padding-right:12px"><span class="badge badge-blue">R&D</span></td></tr>
+          <tr><td style="font-family:var(--font-mono);font-size:10px">Mango Core | Mango Core:Mango Core</td><td style="text-align:right;padding-right:12px"><span class="badge badge-blue">R&D</span></td></tr>
+          <tr><td style="font-family:var(--font-mono);font-size:10px">enCompass | Compass Datacenters:enCompass</td><td style="text-align:right;padding-right:12px"><span class="badge badge-purple">Enc R&D</span></td></tr>
+          <tr><td style="font-family:var(--font-mono);font-size:10px">CenterSquare errProof Implementation | …</td><td style="text-align:right;padding-right:12px"><span class="badge badge-purple">Enc R&D</span></td></tr>
+          <tr><td style="font-family:var(--font-mono);font-size:10px">enCompass Platform | Compass Datacenters:enCompass Platform</td><td style="text-align:right;padding-right:12px"><span class="badge badge-purple">Enc R&D</span></td></tr>
+          <tr><td style="font-family:var(--font-mono);font-size:10px">Radix - Overhead Costs | …</td><td style="text-align:right;padding-right:12px"><span class="badge badge-gray">OH</span></td></tr>
+          <tr><td style="color:var(--text-muted);font-style:italic">Everything else</td><td style="text-align:right;padding-right:12px"><span class="badge badge-green">Chargeable</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header"><div class="section-title">Imported Data Summary</div></div>
+    <div class="section-body">
+      <table>
+        <thead><tr><th style="text-align:left">Period</th><th style="text-align:left">Bucket</th><th>Rows</th><th>Hours</th><th style="padding-right:12px">Cost</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="4" style="vertical-align:top;padding-top:8px;font-family:var(--font-ui);font-weight:500">Feb-26</td><td><span class="badge badge-green">Chargeable</span></td><td>1,840</td><td>2,479</td><td style="padding-right:12px">$290,819</td></tr>
+          <tr><td><span class="badge badge-blue">R&D</span></td><td>624</td><td>1,762</td><td style="padding-right:12px">$120,935</td></tr>
+          <tr><td><span class="badge badge-purple">Enc R&D</span></td><td>1,102</td><td>3,304</td><td style="padding-right:12px">$226,751</td></tr>
+          <tr><td><span class="badge badge-gray">OH</span></td><td>982</td><td>2,110</td><td style="padding-right:12px">—</td></tr>
+          <tr><td rowspan="4" style="vertical-align:top;padding-top:8px;font-family:var(--font-ui);font-weight:500">Jan-26</td><td><span class="badge badge-green">Chargeable</span></td><td>1,712</td><td>2,293</td><td style="padding-right:12px">$260,852</td></tr>
+          <tr><td><span class="badge badge-blue">R&D</span></td><td>584</td><td>1,701</td><td style="padding-right:12px">$115,480</td></tr>
+          <tr><td><span class="badge badge-purple">Enc R&D</span></td><td>1,088</td><td>3,745</td><td style="padding-right:12px">$227,539</td></tr>
+          <tr><td><span class="badge badge-gray">OH</span></td><td>944</td><td>2,086</td><td style="padding-right:12px">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function show(tab, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  el.classList.add('active');
+  if (tab === 'ps' && !window._psChart) initPSChart();
+  if (tab === 'rd' && !window._rdChart) initRDChart();
+  if (tab === 'enc' && !window._encChart) initEncChart();
+}
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => m+'-26');
+const ZERO12 = Array(10).fill(0);
+
+const THEME = {
+  bg: 'transparent', text: '#94A3B8', grid: { left:60,right:24,top:40,bottom:40 },
+  axisLabel: { color:'#64748B', fontSize:10 },
+  splitLine: { lineStyle: { color:'rgba(255,255,255,0.05)' } },
+  axisLine:  { lineStyle: { color:'rgba(255,255,255,0.08)' } },
+  tooltip: { backgroundColor:'#1C1F21', borderColor:'rgba(255,255,255,0.08)', textStyle:{ color:'#E8EDF2', fontSize:12 } }
+};
+
+function baseOption(series) {
+  return {
+    backgroundColor: THEME.bg,
+    textStyle: { fontFamily: 'Source Sans 3, sans-serif', color: THEME.text },
+    tooltip: { trigger:'axis', ...THEME.tooltip },
+    legend: { top:8, textStyle:{ color:'#94A3B8', fontSize:11 } },
+    grid: THEME.grid,
+    xAxis: { type:'category', data: MONTHS, axisLine: THEME.axisLine, axisLabel: THEME.axisLabel },
+    yAxis: { type:'value', axisLabel:{ ...THEME.axisLabel, formatter: v=>'$'+(v/1000).toFixed(0)+'K' }, splitLine: THEME.splitLine },
+    series
+  };
+}
+
+function initPSChart() {
+  window._psChart = echarts.init(document.getElementById('chart-ps'), null, { renderer:'svg' });
+  _psChart.setOption(baseOption([
+    { name:'W-2 Labor (grossed)', type:'bar', stack:'t', data:[211979,218393,...ZERO12], itemStyle:{ color:'#4B9FD6' } },
+    { name:'Subcontractors',      type:'bar', stack:'t', data:[48874,72426,...ZERO12],  itemStyle:{ color:'#C9A96E' } },
+  ]));
+}
+
+function initRDChart() {
+  window._rdChart = echarts.init(document.getElementById('chart-rd'), null, { renderer:'svg' });
+  _rdChart.setOption(baseOption([
+    { name:'W-2 R&D (grossed)', type:'bar', stack:'t', data:[88080,89030,...ZERO12],  itemStyle:{ color:'#A1CE5E' } },
+    { name:'Subs (non-3Pillar)', type:'bar', stack:'t', data:[32550,27495,...ZERO12], itemStyle:{ color:'#5B9BD5' } },
+    { name:'3Pillar',            type:'bar', stack:'t', data:[15176,39427,...ZERO12], itemStyle:{ color:'#C9A96E' } },
+    { name:'Vendors',            type:'bar', stack:'t', data:[10305,10305,...ZERO12], itemStyle:{ color:'#64748B' } },
+  ]));
+}
+
+function initEncChart() {
+  window._encChart = echarts.init(document.getElementById('chart-enc'), null, { renderer:'svg' });
+  _encChart.setOption(baseOption([
+    { name:'W-2 Labor (grossed)', type:'bar', stack:'t', data:[21319,22994,...ZERO12],   itemStyle:{ color:'#A1CE5E' } },
+    { name:'Contractors',         type:'bar', stack:'t', data:[43473,41797,...ZERO12],   itemStyle:{ color:'#5B9BD5' } },
+    { name:'3Pillar',             type:'bar', stack:'t', data:[115428,115428,...ZERO12], itemStyle:{ color:'#C9A96E' } },
+    { name:'Testing Xperts',      type:'bar', stack:'t', data:[47319,47319,...ZERO12],   itemStyle:{ color:'#6AAA8E' } },
+    { name:'Vendors',             type:'bar', stack:'t', data:[10305,10305,...ZERO12],   itemStyle:{ color:'#64748B' } },
+  ]));
+}
+
+// Init first chart on load
+setTimeout(initPSChart, 100);
+</script>
+</body>
+</html>

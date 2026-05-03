@@ -1,0 +1,5 @@
+.env
+node_modules/
+*.csv
+*.xlsx
+import_log.txt
