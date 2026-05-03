@@ -202,7 +202,7 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
                 return (
                   <React.Fragment key={co}>
                     {/* Company subtotal row */}
-                    <tr className="border-t-2 border-dash-border bg-dash-surface-raised">
+                    <tr className="border-t-2 border-dash-border bg-white/[0.09]">
                       <td className="py-1.5 px-3 font-semibold text-dash-text">{co}</td>
                       {MONTHS.map((m) => {
                         const t = coMC(coData, m);
@@ -217,13 +217,13 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
                       return (
                         <React.Fragment key={dept}>
                           {/* Dept subtotal row */}
-                          <tr className="bg-dash-surface">
-                            <td className="py-1 px-3 pl-7 font-medium text-dash-text-secondary italic">{dept}</td>
+                          <tr className="bg-white/[0.05]">
+                            <td className="py-1 px-3 pl-7 font-medium text-dash-text italic">{dept}</td>
                             {MONTHS.map((m) => {
                               const t = deptMC(deptData, m);
-                              return <td key={m} className="py-1 px-2 text-right font-mono text-dash-text-secondary">{t ? formatCurrencyAccounting(t) : "—"}</td>;
+                              return <td key={m} className="py-1 px-2 text-right font-mono text-dash-text">{t ? formatCurrencyAccounting(t) : "—"}</td>;
                             })}
-                            <td className="py-1 px-3 text-right font-mono text-dash-text-secondary">{formatCurrencyFull(deptYTD)}</td>
+                            <td className="py-1 px-3 text-right font-mono text-dash-text">{formatCurrencyFull(deptYTD)}</td>
                           </tr>
                           {/* Person rows */}
                           {names.map((name, i) => {
