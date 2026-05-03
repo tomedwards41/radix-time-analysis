@@ -85,7 +85,7 @@ export function aggregateToCategories(
   const map = new Map<string, { month: number; sub_category: string; total_cost: number; total_hours: number }>();
 
   for (const row of resolvedRows) {
-    const sub = row.sub_category ?? "Unknown";
+    const sub = row.sub_category ?? `${row.emp_type} - ${row.dept}`;
     const key = `${row.month}::${sub}`;
     const existing = map.get(key);
     if (existing) {
