@@ -7,7 +7,7 @@ import {
   getPersonDetail, getAvailableYears,
   getRateHistory, getAllMonthlyOverridesForYear,
   getRdAllocations, getRdFeatures, getEncPlatformAllocations,
-  upsertRdAllocation, upsertEncPlatformAllocation,
+  upsertRdAllocation, upsertEncPlatformAllocation, upsertRdFeature,
 } from "~/lib/queries";
 import {
   resolvePersonCosts, aggregateToCategories,
@@ -65,6 +65,16 @@ export async function action({ request, context }: Route.ActionArgs) {
     for (const { feature_id, pct } of raw) {
       await upsertEncPlatformAllocation(env.DB, feature_id, year, month, pct);
     }
+  }
+
+  if (intent === "save_feature") {
+    const featureIdRaw = form.get("feature_id") as string;
+    await upsertRdFeature(env.DB, {
+      id: featureIdRaw ? Number(featureIdRaw) : null,
+      bucket: "enc_platforms",
+      name: form.get("name") as string,
+      status: (form.get("status") as string) || "Active",
+    });
   }
 
   if (intent === "save_person_alloc") {
@@ -150,8 +160,14 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
 
   // ── Admin panel state ──────────────────────────────────────────────────────
 
-  const [showEncAdmin, setShowEncAdmin]       = useState(false);
-  const [showPersonAdmin, setShowPersonAdmin] = useState(false);
+  const [showEncAdmin, setShowEncAdmin]         = useState(false);
+  const [showPersonAdmin, setShowPersonAdmin]   = useState(false);
+  const [showFeatureAdmin, setShowFeatureAdmin] = useState(false);
+
+  const allEncFeatures = features.filter((f) => f.bucket === "enc_platforms");
+  const [featureEdits, setFeatureEdits] = useState<Record<number, { name: string; status: string }>>(() =>
+    Object.fromEntries(allEncFeatures.map((f) => [f.id, { name: f.name, status: f.status }]))
+  );
 
   // enc_platform admin: local edits keyed by "feature_id:month"
   const [encEdits, setEncEdits] = useState<Record<string, string>>(() => {
@@ -319,6 +335,94 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
         })}
 
       </div>{/* end shared scroll container */}
+
+      {/* Admin: enCompass Platform Features */}
+      <div className="bg-dash-surface rounded-lg border border-dash-border overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowFeatureAdmin((v) => !v)}
+          className="w-full px-4 py-2.5 border-b border-dash-border bg-dash-surface-raised flex items-center justify-between hover:bg-dash-surface transition-colors"
+        >
+          <h2 className="text-[11px] font-ui font-semibold text-dash-text-secondary uppercase tracking-widest">
+            Admin — enCompass Platform Features
+          </h2>
+          <span className="text-[10px] text-dash-text-muted">{showFeatureAdmin ? "▲ Collapse" : "▼ Expand"}</span>
+        </button>
+        {showFeatureAdmin && (
+          <div className="p-4 space-y-4">
+            <p className="text-xs text-dash-text-muted font-ui">
+              Add or rename enCompass Platform features/versions. Active features appear in the allocation tables and monthly % editor.
+            </p>
+            <table className="w-auto min-w-[520px]">
+              <thead>
+                <tr className="bg-dash-surface-raised">
+                  <TH>Feature / Version Name</TH>
+                  <TH>Status</TH>
+                  <TH></TH>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dash-border-divider">
+                {allEncFeatures.map((f) => (
+                  <tr key={f.id} className="hover:bg-dash-surface-raised/50">
+                    <td className="py-1.5 px-2">
+                      <input
+                        type="text"
+                        value={featureEdits[f.id]?.name ?? f.name}
+                        onChange={(e) => setFeatureEdits((prev) => ({ ...prev, [f.id]: { ...prev[f.id], name: e.target.value } }))}
+                        className="w-72 bg-dash-surface-raised border border-dash-border rounded px-2 py-0.5 text-xs font-ui text-dash-text focus:outline-none focus:border-dash-accent"
+                      />
+                    </td>
+                    <td className="py-1.5 px-2">
+                      <select
+                        value={featureEdits[f.id]?.status ?? f.status}
+                        onChange={(e) => setFeatureEdits((prev) => ({ ...prev, [f.id]: { ...prev[f.id], status: e.target.value } }))}
+                        className="bg-dash-surface-raised border border-dash-border rounded px-2 py-0.5 text-xs font-ui text-dash-text focus:outline-none focus:border-dash-accent"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </td>
+                    <td className="py-1.5 px-2">
+                      <form method="post">
+                        <input type="hidden" name="intent"     value="save_feature" />
+                        <input type="hidden" name="feature_id" value={f.id} />
+                        <input type="hidden" name="name"       value={featureEdits[f.id]?.name ?? f.name} />
+                        <input type="hidden" name="status"     value={featureEdits[f.id]?.status ?? f.status} />
+                        <button
+                          type="submit"
+                          className="px-2.5 py-0.5 text-[10px] font-ui font-medium rounded border transition-colors bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20"
+                        >
+                          Save
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="border-t border-dash-border pt-4">
+              <p className="text-[11px] font-ui font-semibold text-dash-text-secondary uppercase tracking-wide mb-2">Add New Feature</p>
+              <form method="post" className="flex items-center gap-3">
+                <input type="hidden" name="intent"     value="save_feature" />
+                <input type="hidden" name="feature_id" value="" />
+                <input type="hidden" name="status"     value="Active" />
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Feature / version name…"
+                  className="w-72 bg-dash-surface-raised border border-dash-border rounded px-2 py-1 text-xs font-ui text-dash-text focus:outline-none focus:border-dash-accent placeholder:text-dash-text-muted/50"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1 text-xs font-ui font-medium rounded border transition-colors bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20"
+                >
+                  Add Feature
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Admin: enCompass Platform Monthly Allocations */}
       <div className="bg-dash-surface rounded-lg border border-dash-border overflow-hidden">

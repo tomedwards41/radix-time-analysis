@@ -274,6 +274,27 @@ export async function upsertEncPlatformAllocation(
     .run();
 }
 
+export async function upsertRdFeature(
+  db: DB,
+  feature: { id?: number | null; bucket: string; name: string; status: string }
+): Promise<void> {
+  if (feature.id) {
+    await db
+      .prepare("UPDATE rd_features SET name = ?, status = ? WHERE id = ?")
+      .bind(feature.name, feature.status, feature.id)
+      .run();
+  } else {
+    await db
+      .prepare(`
+        INSERT INTO rd_features (bucket, name, fixed_pct, status, sort_order)
+        SELECT ?, ?, NULL, ?,
+          COALESCE((SELECT MAX(sort_order) FROM rd_features WHERE bucket = ?), 0) + 1
+      `)
+      .bind(feature.bucket, feature.name, feature.status, feature.bucket)
+      .run();
+  }
+}
+
 // Row count per NC bucket for the upload page summary
 export async function getImportSummary(db: DB): Promise<{ nc_mapped: string; year: number; month: number; row_count: number; total_hours: number; total_cost: number }[]> {
   const { results } = await db
