@@ -1,5 +1,4 @@
 import React from "react";
-import { Link } from "react-router";
 import type { Route } from "./+types/ps";
 import { requireAccess } from "~/lib/auth";
 import {
@@ -41,18 +40,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const personRows = resolvePersonCosts(personRaw, roster, rateHistory, overrides, "Chargeable");
   const laborRows  = aggregateToCategories(personRows);
   const monthly    = computePS(laborRows, rates, year);
-
-  // Excel export — return binary response when ?format=xlsx
-  if (new URL(request.url).searchParams.get("format") === "xlsx") {
-    const { generatePSExcel } = await import("~/lib/excel");
-    const data = generatePSExcel(monthly, personRows, year);
-    return new Response(data.buffer as ArrayBuffer, {
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="PS_Labor_${year}.xlsx"`,
-      },
-    });
-  }
 
   const ytdMonth = Math.max(...monthly.filter((m) => m.total_cos > 0).map((m) => m.month), 0);
   return { monthly, personRows, year, ytdMonth };
@@ -155,13 +142,24 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
           <h1 className="text-lg font-heading font-semibold text-dash-text">Radix Professional Services</h1>
           <p className="text-xs text-dash-text-muted font-ui">Cost of Sales — {year} · YTD through {MONTH_LABELS[(ytdMonth || 1) - 1]}</p>
         </div>
-        <Link
-          to="/ps?format=xlsx"
-          reloadDocument
+        <button
+          onClick={async () => {
+            const { generatePSExcel } = await import("~/lib/excel");
+            const data = generatePSExcel(monthly, personRows, year);
+            const blob = new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `PS_Labor_${year}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}
           className="flex-shrink-0 px-3 py-1.5 text-xs font-ui font-medium rounded border transition-colors bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20"
         >
           ↓ Export to Excel
-        </Link>
+        </button>
       </div>
 
       {/* KPI row */}

@@ -2,7 +2,6 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "radix-labor-web",
   "compatibility_date": "2025-04-04",
-  "compatibility_flags": ["nodejs_compat"],
   "main": "./workers/app.ts",
   "routes": [
     { "pattern": "dashboard.radixiot.work/labor/*", "zone_name": "radixiot.work" }
