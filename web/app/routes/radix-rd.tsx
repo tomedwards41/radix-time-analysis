@@ -192,7 +192,7 @@ export default function RadixRDRoute({ loaderData }: Route.ComponentProps) {
 
       <ChartWrapper option={chartOption} height={260} />
 
-      <Section title="Labor Costs (excl. taxes / benes)">
+      <Section title="Labor Costs">
         <MonthlyTable
           year={year}
           rows={[
@@ -203,12 +203,11 @@ export default function RadixRDRoute({ loaderData }: Route.ComponentProps) {
           totalRow={{ label: "Subtotal Labor", values: monthly.map((m) => m.subtotal_labor) }}
           footerRows={[
             { label: "PR Tax & Bene's %",     values: monthly.map((m) => formatPercent(m.tax_bene_rate)), isText: true },
-            { label: "Payroll Taxes & Benes", values: monthly.map((m) => m.w2_rd * m.tax_bene_rate) },
+            { label: "Payroll Taxes & Benes", values: monthly.map((m) => m.w2_rd * m.tax_bene_rate), bold: true },
+            { label: "Total Labor",           values: monthly.map((m) => m.cip), bold: true },
           ]}
         />
-      </Section>
-
-      <Section title="Vendors">
+        <p className="mt-4 mb-1 px-1 text-[10px] font-ui font-semibold uppercase tracking-wider text-dash-text-secondary">Vendor Invoices</p>
         <MonthlyTable
           year={year}
           rows={[
@@ -217,6 +216,23 @@ export default function RadixRDRoute({ loaderData }: Route.ComponentProps) {
           ]}
           totalRow={{ label: "Subtotal Vendor Invoices", values: monthly.map((m) => m.vendor_innoscale + m.vendor_powerbi) }}
         />
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <tbody>
+              <tr className="border-t-2 border-dash-border font-semibold">
+                <td className="py-2 px-3 text-dash-text w-52">Total Costs</td>
+                {MONTHS.map((m) => (
+                  <td key={m} className="py-2 px-2 text-right font-mono text-dash-text">
+                    {monthly[m - 1].total_cip ? formatCurrencyAccounting(monthly[m - 1].total_cip) : "—"}
+                  </td>
+                ))}
+                <td className="py-2 px-3 text-right font-mono text-dash-text">
+                  {formatCurrencyFull(monthly.reduce((s, m) => s + m.total_cip, 0))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </Section>
 
       <Section title="Journal Entry (incl. taxes & benes)">
@@ -353,7 +369,19 @@ function MonthlyTable({ year, rows, totalRow, footerRows }: {
               <td className="py-2 px-3 text-right font-mono text-dash-text">{formatCurrencyFull(ytdCalc(totalRow.values))}</td>
             </tr>
           )}
-          {footerRows?.map((row, i) => (
+          {footerRows?.map((row, i) => row.bold ? (
+            <tr key={i} className="border-t border-dash-border font-semibold">
+              <td className="py-2 px-3 text-dash-text">{row.label}</td>
+              {row.values.map((v, j) => (
+                <td key={j} className="py-2 px-2 text-right font-mono text-dash-text">
+                  {formatCurrencyAccounting(typeof v === "number" ? v : 0)}
+                </td>
+              ))}
+              <td className="py-2 px-3 text-right font-mono text-dash-text">
+                {formatCurrencyFull(ytdCalc(row.values))}
+              </td>
+            </tr>
+          ) : (
             <tr key={i} className="border-t border-dash-border-divider">
               <td className="py-1.5 px-3 text-dash-text-muted italic">{row.label}</td>
               {row.values.map((v, j) => (
