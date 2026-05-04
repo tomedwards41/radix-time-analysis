@@ -11,7 +11,6 @@ import {
   computePS, sumField, MONTHS,
   resolvePersonCosts, aggregateToCategories,
 } from "~/lib/computations";
-import { generatePSExcel } from "~/lib/excel";
 import {
   formatCurrencyFull, formatCurrencyAccounting, formatPercent, formatHours, MONTH_LABELS,
 } from "~/lib/formatters";
@@ -45,6 +44,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   // Excel export — return binary response when ?format=xlsx
   if (new URL(request.url).searchParams.get("format") === "xlsx") {
+    const { generatePSExcel } = await import("~/lib/excel");
     const data = generatePSExcel(monthly, personRows, year);
     return new Response(data.buffer as ArrayBuffer, {
       headers: {
