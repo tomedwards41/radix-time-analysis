@@ -271,7 +271,7 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
           const bucketYTD  = ytdMonths.reduce((s, m) => s + bucketVal(m), 0);
 
           return (
-            <Section key={bucket} title={`Step 2 — ${bucketLabels[bucket]}`}>
+            <Section key={bucket} title={bucketLabels[bucket]}>
               <table style={TABLE_STYLE}>
                 <TableCols />
                 <thead>
