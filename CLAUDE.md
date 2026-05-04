@@ -66,6 +66,7 @@ Radix Time Analysis/           ← git root
 │   │       ├── queries.ts     ← all D1 query functions
 │   │       ├── computations.ts← cost calculation logic
 │   │       ├── formatters.ts  ← currency/date helpers, MONTH_LABELS
+│   │       ├── excel.ts       ← Excel export generators (all 4 tabs)
 │   │       ├── auth.ts        ← Cloudflare Access JWT validation
 │   │       └── echarts-theme.ts
 │   └── workers/app.ts         ← Cloudflare Workers entry point
@@ -86,6 +87,8 @@ Radix Time Analysis/           ← git root
 | `/interco-rd` | `routes/interco-rd.tsx` | Detailed interco R&D invoice by feature/bucket |
 
 To add a route: create the file, register it in `web/app/routes.ts`, add it to `NavBar.tsx`.
+
+Each analysis tab (PS, Radix R&D, enCompass R&D, Interco R&D) has an **Export to Excel** button in the page header. See [Excel Exports](#excel-exports) section below.
 
 ---
 
@@ -203,6 +206,47 @@ Flow: Cloudflare Access injects a `CF_Authorization` JWT → decode email → lo
 **Styling:** Tailwind CSS v4 with a custom design system. Key color tokens: `dash-surface`, `dash-surface-raised`, `dash-nav-bg`, `dash-border`, `dash-accent`, `dash-text`, `dash-text-muted`, `dash-text-secondary`, `dash-warning`, `dash-positive`. Font tokens: `font-heading`, `font-ui`.
 
 **Section component:** `function Section({ title, children, variant })` — `variant="primary"` (default) or `variant="secondary"` (Step 2 bucket boxes on interco-rd).
+
+---
+
+## Excel Exports
+
+Every analysis tab has a client-side **↓ Export to Excel** button in the page header. All generation happens in the browser via `xlsx` (SheetJS) — **xlsx must never run server-side** as it is incompatible with the Cloudflare Workers edge runtime.
+
+**Pattern for every export button:**
+```tsx
+<button
+  onClick={async () => {
+    const { generateXxxExcel } = await import("~/lib/excel");
+    const data = generateXxxExcel(...args);
+    const blob = new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `Filename_${year}.xlsx`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }}
+>↓ Export to Excel</button>
+```
+
+The dynamic `import("~/lib/excel")` ensures xlsx is only loaded in the browser, never during Worker initialization.
+
+**Do NOT add `"compatibility_flags": ["nodejs_compat"]` to `wrangler.jsonc`** — this flag breaks D1 bindings.
+
+### Export contents per tab
+
+| Tab | File | Sheets |
+|---|---|---|
+| Professional Services | `PS_Labor_{year}.xlsx` | Summary, Journal Entry, Hours by Person, Cost by Person |
+| Radix R&D | `RadixRD_{year}.xlsx` | Summary, Journal Entry, Hours by Person, Cost by Person |
+| enCompass R&D | `EncRD_{year}.xlsx` | Summary, Journal Entry, Interco Invoice, Hours by Person, Cost by Person |
+| Interco R&D | `IntercoRD_{year}.xlsx` | Step 1, Enc Platforms, Data Platforms, Reporting-BI, Maintenance |
+
+All sheet generators live in `web/app/lib/excel.ts`:
+- `generatePSExcel(monthly, personRows, year)`
+- `generateRadixRDExcel(monthly, personRows, year)`
+- `generateEncRDExcel(monthly, personRows, year)`
+- `generateIntercoRDExcel(step1, step2, features, year)`
 
 ---
 
