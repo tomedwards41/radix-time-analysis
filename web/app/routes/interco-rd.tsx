@@ -215,7 +215,7 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
       <div className="overflow-x-auto space-y-4" style={{ minWidth: 0 }}>
 
         {/* Step 1 — categories as rows, all 12 months as columns */}
-        <Section title="Step 1 — Bucket Allocation (with 15% Markup)">
+        <Section title="enCompass R&D Interco Allocation (incl. 15% markup)">
           <table style={TABLE_STYLE}>
             <TableCols />
             <thead>
