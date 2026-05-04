@@ -41,7 +41,7 @@ export function formatNumber(val: number | null | undefined): string {
 
 export function formatHours(val: number | null | undefined): string {
   if (val == null) return "—";
-  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(val);
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
 }
 
 export const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
