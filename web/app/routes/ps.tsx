@@ -162,7 +162,8 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
           totalRow={{ label: "Subtotal Labor", values: monthly.map((m) => m.subtotal_labor) }}
           footerRows={[
             { label: "PR Tax & Bene's %",     values: monthly.map((m) => formatPercent(m.tax_bene_rate)), isText: true },
-            { label: "Payroll Taxes & Benes", values: monthly.map((m) => (m.w2_ops + m.w2_rd + m.w2_ga) * m.tax_bene_rate) },
+            { label: "Payroll Taxes & Benes", values: monthly.map((m) => (m.w2_ops + m.w2_rd + m.w2_ga) * m.tax_bene_rate), bold: true },
+            { label: "Total Costs",           values: monthly.map((m) => m.total_cos), bold: true },
           ]}
         />
       </Section>
@@ -344,7 +345,19 @@ function MonthlyTable({
               </td>
             </tr>
           )}
-          {footerRows?.map((row, i) => (
+          {footerRows?.map((row, i) => row.bold ? (
+            <tr key={i} className="border-t border-dash-border font-semibold">
+              <td className="py-2 px-3 text-dash-text">{row.label}</td>
+              {row.values.map((v, j) => (
+                <td key={j} className="py-2 px-2 text-right font-mono text-dash-text">
+                  {formatCurrencyAccounting(typeof v === "number" ? v : 0)}
+                </td>
+              ))}
+              <td className="py-2 px-3 text-right font-mono text-dash-text">
+                {formatCurrencyFull(ytdCalc(row.values))}
+              </td>
+            </tr>
+          ) : (
             <tr key={i} className="border-t border-dash-border-divider">
               <td className="py-1.5 px-3 text-dash-text-muted italic">{row.label}</td>
               {row.values.map((v, j) => (
