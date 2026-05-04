@@ -10,6 +10,7 @@ import {
   computePS, sumField, MONTHS,
   resolvePersonCosts, aggregateToCategories,
 } from "~/lib/computations";
+import { generatePSExcel } from "~/lib/excel";
 import {
   formatCurrencyFull, formatCurrencyAccounting, formatPercent, formatHours, MONTH_LABELS,
 } from "~/lib/formatters";
@@ -39,9 +40,20 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const personRows = resolvePersonCosts(personRaw, roster, rateHistory, overrides, "Chargeable");
   const laborRows  = aggregateToCategories(personRows);
-  const monthly = computePS(laborRows, rates, year);
-  const ytdMonth = Math.max(...monthly.filter((m) => m.total_cos > 0).map((m) => m.month), 0);
+  const monthly    = computePS(laborRows, rates, year);
 
+  // Excel export — return binary response when ?format=xlsx
+  if (new URL(request.url).searchParams.get("format") === "xlsx") {
+    const data = generatePSExcel(monthly, personRows, year);
+    return new Response(data.buffer as ArrayBuffer, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="PS_Labor_${year}.xlsx"`,
+      },
+    });
+  }
+
+  const ytdMonth = Math.max(...monthly.filter((m) => m.total_cos > 0).map((m) => m.month), 0);
   return { monthly, personRows, year, ytdMonth };
 }
 
@@ -137,9 +149,17 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
   return (
     <div className="p-4 space-y-4">
       {/* Page header */}
-      <div>
-        <h1 className="text-lg font-heading font-semibold text-dash-text">Radix Professional Services</h1>
-        <p className="text-xs text-dash-text-muted font-ui">Cost of Sales — {year} · YTD through {MONTH_LABELS[(ytdMonth || 1) - 1]}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-heading font-semibold text-dash-text">Radix Professional Services</h1>
+          <p className="text-xs text-dash-text-muted font-ui">Cost of Sales — {year} · YTD through {MONTH_LABELS[(ytdMonth || 1) - 1]}</p>
+        </div>
+        <a
+          href={`/ps?format=xlsx`}
+          className="flex-shrink-0 px-3 py-1.5 text-xs font-ui font-medium rounded border transition-colors bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20"
+        >
+          ↓ Export to Excel
+        </a>
       </div>
 
       {/* KPI row */}
