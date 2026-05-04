@@ -102,7 +102,7 @@ export default function RosterRoute({ loaderData }: Route.ComponentProps) {
                 <TH>Dept</TH>
                 <TH>Type</TH>
                 <TH>Category</TH>
-                <TH>Alloc</TH>
+                <TH>Enc R&amp;D Alloc</TH>
                 <TH right>Hourly Rate</TH>
                 <TH right>Rate As Of</TH>
               </tr>
