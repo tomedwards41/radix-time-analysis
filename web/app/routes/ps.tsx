@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router";
 import type { Route } from "./+types/ps";
 import { requireAccess } from "~/lib/auth";
 import {
@@ -154,12 +155,13 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
           <h1 className="text-lg font-heading font-semibold text-dash-text">Radix Professional Services</h1>
           <p className="text-xs text-dash-text-muted font-ui">Cost of Sales — {year} · YTD through {MONTH_LABELS[(ytdMonth || 1) - 1]}</p>
         </div>
-        <a
-          href={`/ps?format=xlsx`}
+        <Link
+          to="/ps?format=xlsx"
+          reloadDocument
           className="flex-shrink-0 px-3 py-1.5 text-xs font-ui font-medium rounded border transition-colors bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20"
         >
           ↓ Export to Excel
-        </a>
+        </Link>
       </div>
 
       {/* KPI row */}
