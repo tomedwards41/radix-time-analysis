@@ -58,11 +58,10 @@ export async function action({ request, context }: Route.ActionArgs) {
   const form   = await request.formData();
   const intent = form.get("intent") as string;
 
-  if (intent === "save_enc_alloc") {
-    const year  = Number(form.get("year"));
-    const month = Number(form.get("month"));
-    const raw   = JSON.parse(form.get("allocs") as string) as { feature_id: number; pct: number }[];
-    for (const { feature_id, pct } of raw) {
+  if (intent === "save_enc_alloc_all") {
+    const year = Number(form.get("year"));
+    const raw  = JSON.parse(form.get("allocs") as string) as { feature_id: number; month: number; pct: number }[];
+    for (const { feature_id, month, pct } of raw) {
       await upsertEncPlatformAllocation(env.DB, feature_id, year, month, pct);
     }
   }
@@ -169,10 +168,12 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
     Object.fromEntries(allEncFeatures.map((f) => [f.id, { name: f.name, status: f.status }]))
   );
 
-  // enc_platform admin: local edits keyed by "feature_id:month"
+  // enc_platform admin: local edits keyed by "feature_id:month", stored as % (0-100)
   const [encEdits, setEncEdits] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
-    for (const a of encAllocs) { init[`${a.feature_id}:${a.month}`] = String(a.allocation_pct); }
+    for (const a of encAllocs) {
+      init[`${a.feature_id}:${a.month}`] = String(Math.round(a.allocation_pct * 1000) / 10);
+    }
     return init;
   });
 
@@ -193,7 +194,7 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
   // Months to show in enc admin — months that have labor data
   const adminMonths = ytdMonths.length > 0 ? ytdMonths : [1, 2, 3];
 
-  // Totals per month for enc admin
+  // Totals per month for enc admin (0-100 scale)
   const encMonthTotal = (month: number) => {
     let total = 0;
     for (const f of encFeatures) {
@@ -201,6 +202,7 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
     }
     return total;
   };
+  const encMonthValid = (month: number) => Math.abs(encMonthTotal(month) - 100) < 0.1;
 
   return (
     <div className="p-4 space-y-4">
@@ -437,62 +439,83 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
           <span className="text-[10px] text-dash-text-muted">{showEncAdmin ? "▲ Collapse" : "▼ Expand"}</span>
         </button>
         {showEncAdmin && (
-          <div className="p-4 space-y-4">
-            <p className="text-xs text-dash-text-muted font-ui">
-              Enter the % of each month's enCompass Platforms bucket allocated to each active feature. Each month's column must total 100%.
+          <div className="p-4">
+            <p className="text-xs text-dash-text-muted font-ui mb-4">
+              Enter the % of each month's enCompass Platforms bucket allocated to each active feature. Each column must total 100%.
             </p>
-            {adminMonths.map((month) => {
-              const total = encMonthTotal(month);
-              const isValid = Math.abs(total - 1.0) < 0.001;
-              return (
-                <div key={month} className="border border-dash-border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-dash-surface-raised border-b border-dash-border flex items-center justify-between">
-                    <span className="text-[11px] font-ui font-semibold text-dash-text-secondary uppercase tracking-wide">
-                      {MONTH_LABELS[month - 1]}-{String(year).slice(-2)}
-                    </span>
-                    <span className={`text-[10px] font-ui font-semibold ${isValid ? "text-dash-positive" : "text-dash-warning"}`}>
-                      Total: {(total * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <form method="post" className="p-3">
-                    <input type="hidden" name="intent" value="save_enc_alloc" />
-                    <input type="hidden" name="year"   value={year} />
-                    <input type="hidden" name="month"  value={month} />
-                    <div className="space-y-1.5">
-                      {encFeatures.map((f) => (
-                        <div key={f.id} className="flex items-center gap-3">
-                          <label className="text-xs font-ui text-dash-text w-64 truncate">{f.name}</label>
-                          <input
-                            type="number"
-                            step="0.001"
-                            min="0"
-                            max="1"
-                            value={encEdits[`${f.id}:${month}`] ?? "0"}
-                            onChange={(e) => setEncEdits((prev) => ({ ...prev, [`${f.id}:${month}`]: e.target.value }))}
-                            className="w-24 bg-dash-surface-raised border border-dash-border rounded px-2 py-1 text-xs font-ui text-dash-text text-right focus:outline-none focus:border-dash-accent"
-                          />
-                          <span className="text-[10px] text-dash-text-muted">
-                            {((parseFloat(encEdits[`${f.id}:${month}`] ?? "0") || 0) * 100).toFixed(1)}%
-                          </span>
-                        </div>
+            <form method="post">
+              <input type="hidden" name="intent" value="save_enc_alloc_all" />
+              <input type="hidden" name="year"   value={year} />
+              <input
+                type="hidden"
+                name="allocs"
+                value={JSON.stringify(
+                  encFeatures.flatMap((f) =>
+                    MONTHS.map((m) => ({
+                      feature_id: f.id,
+                      month: m,
+                      pct: (parseFloat(encEdits[`${f.id}:${m}`] ?? "0") || 0) / 100,
+                    }))
+                  )
+                )}
+              />
+              <div className="overflow-x-auto">
+                <table className="w-auto border-collapse">
+                  <thead>
+                    <tr className="bg-dash-surface-raised">
+                      <th className="py-1.5 px-3 text-left text-[10px] font-ui font-semibold text-dash-text-secondary uppercase tracking-wide whitespace-nowrap min-w-[180px]">Feature</th>
+                      {MONTHS.map((m) => (
+                        <th key={m} className="py-1.5 px-1.5 text-center text-[10px] font-ui font-semibold text-dash-text-secondary uppercase tracking-wide whitespace-nowrap w-14">
+                          {MONTH_LABELS[m - 1]}
+                        </th>
                       ))}
-                    </div>
-                    <input
-                      type="hidden"
-                      name="allocs"
-                      value={JSON.stringify(encFeatures.map((f) => ({ feature_id: f.id, pct: parseFloat(encEdits[`${f.id}:${month}`] ?? "0") || 0 })))}
-                    />
-                    <button
-                      type="submit"
-                      disabled={!isValid}
-                      className="mt-3 px-4 py-1.5 text-xs font-ui font-medium rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20"
-                    >
-                      Save {MONTH_LABELS[month - 1]}
-                    </button>
-                  </form>
-                </div>
-              );
-            })}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-dash-border-divider">
+                    {encFeatures.map((f) => (
+                      <tr key={f.id} className="hover:bg-dash-surface-raised/50">
+                        <td className="py-1.5 px-3 text-xs font-ui text-dash-text whitespace-nowrap">{f.name}</td>
+                        {MONTHS.map((m) => (
+                          <td key={m} className="py-1 px-1">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              value={encEdits[`${f.id}:${m}`] ?? ""}
+                              placeholder="0"
+                              onChange={(e) => setEncEdits((prev) => ({ ...prev, [`${f.id}:${m}`]: e.target.value }))}
+                              className="w-14 bg-dash-surface-raised border border-dash-border rounded px-1.5 py-0.5 text-xs font-ui text-dash-text text-right focus:outline-none focus:border-dash-accent"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-dash-border">
+                      <td className="py-1.5 px-3 text-xs font-ui font-semibold text-dash-text">Total</td>
+                      {MONTHS.map((m) => {
+                        const total = encMonthTotal(m);
+                        const valid = encMonthValid(m);
+                        const color = total === 0 ? "text-dash-text-muted" : valid ? "text-dash-positive" : "text-dash-warning";
+                        return (
+                          <td key={m} className={`py-1.5 px-1 text-center text-xs font-ui font-semibold tabular-nums ${color}`}>
+                            {total === 0 ? "—" : `${total.toFixed(0)}%`}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <button
+                type="submit"
+                className="mt-4 px-4 py-1.5 text-xs font-ui font-medium rounded border transition-colors bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20"
+              >
+                Save All
+              </button>
+            </form>
           </div>
         )}
       </div>
