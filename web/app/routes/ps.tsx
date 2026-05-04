@@ -50,10 +50,16 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
   const { monthly, personRows, year, ytdMonth } = loaderData;
 
   const activeMonths = monthly.filter((m) => m.total_cos > 0);
+  const activeMonthNums = new Set(activeMonths.map((m) => m.month));
   const ytdCOS    = sumField(activeMonths, "total_cos");
   const ytdHours  = sumField(activeMonths, "total_hours");
   const ytdW2     = sumField(activeMonths, "cos_labor");
   const ytdSubs   = sumField(activeMonths, "cos_subs");
+
+  const ytdW2Hours  = personRows.filter((r) => r.emp_type === "W-2"  && activeMonthNums.has(r.month)).reduce((s, r) => s + (r.hours ?? 0), 0);
+  const ytdSubHours = personRows.filter((r) => r.emp_type === "Sub"  && activeMonthNums.has(r.month)).reduce((s, r) => s + (r.hours ?? 0), 0);
+  const w2PerHour   = ytdW2Hours  > 0 ? ytdW2  / ytdW2Hours  : null;
+  const subPerHour  = ytdSubHours > 0 ? ytdSubs / ytdSubHours : null;
 
   // Chart: monthly COS split W-2 vs Subs
   const chartOption: EChartsOption = {
@@ -143,6 +149,24 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
         <MetricCard title="YTD W-2 Labor"  value={formatCurrencyFull(ytdW2)}    subtitle="incl. taxes & benes" />
         <MetricCard title="YTD Subs"       value={formatCurrencyFull(ytdSubs)}  />
         <MetricCard title="YTD Hours"      value={formatHours(ytdHours)}        subtitle="chargeable" />
+        {/* Cost per hour card */}
+        <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
+          <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">Cost per Hour</p>
+          <div className="flex flex-col gap-0.5 flex-1 justify-center">
+            <div>
+              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">
+                {w2PerHour != null ? formatCurrencyFull(w2PerHour) : "—"}
+              </p>
+              <p className="text-[10px] text-dash-text-muted">W-2 incl. T&amp;B</p>
+            </div>
+            <div className="mt-1">
+              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">
+                {subPerHour != null ? formatCurrencyFull(subPerHour) : "—"}
+              </p>
+              <p className="text-[10px] text-dash-text-muted">Contractors</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Monthly chart */}
