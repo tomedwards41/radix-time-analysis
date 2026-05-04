@@ -198,46 +198,133 @@ export default function EncRDRoute({ loaderData }: Route.ComponentProps) {
 
       <ChartWrapper option={chartOption} height={260} />
 
-      <Section title="Labor Costs (excl. taxes / benes)">
-        <MonthlyTable
-          year={year}
-          rows={[
-            { label: "W-2 — Ops",      values: monthly.map((m) => m.w2_ops) },
-            { label: "W-2 — R&D",      values: monthly.map((m) => m.w2_rd) },
-            { label: "Sub — R&D",      values: monthly.map((m) => m.sub_rd_contractors) },
-            { label: "Sub — 3Pillar",  values: monthly.map((m) => m.sub_3pillar) },
-            { label: "Sub — Testing",  values: monthly.map((m) => m.sub_testing) },
-          ]}
-          totalRow={{ label: "Subtotal Labor", values: monthly.map((m) => m.subtotal_labor) }}
-          footerRows={[
-            { label: "PR Tax & Bene's %",     values: monthly.map((m) => formatPercent(m.tax_bene_rate)), isText: true },
-            { label: "Payroll Taxes & Benes", values: monthly.map((m) => (m.w2_ops + m.w2_rd) * m.tax_bene_rate) },
-          ]}
-        />
-      </Section>
-
-      <Section title="Labor Sources (incl. benes & taxes)">
-        <MonthlyTable
-          year={year}
-          rows={[
-            { label: "R&D Labor (incl taxes / benes)", values: monthly.map((m) => m.rd_labor_grossed) },
-            { label: "R&D Contractors",                values: monthly.map((m) => m.sub_rd_contractors) },
-            { label: "R&D Subs — 3Pillar",             values: monthly.map((m) => m.sub_3pillar) },
-            { label: "R&D Subs — Testing Xperts",      values: monthly.map((m) => m.sub_testing) },
-          ]}
-          totalRow={{ label: "Subtotal", values: monthly.map((m) => m.total_labor_sources) }}
-        />
-      </Section>
-
-      <Section title="Vendors">
-        <MonthlyTable
-          year={year}
-          rows={[
-            { label: "Innoscale", values: monthly.map((m) => m.vendor_innoscale) },
-            { label: "Power BI",  values: monthly.map((m) => m.vendor_powerbi) },
-          ]}
-          totalRow={{ label: "Subtotal Vendor Invoices", values: monthly.map((m) => m.vendor_innoscale + m.vendor_powerbi) }}
-        />
+      <Section title="Labor Costs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-dash-border">
+                <th className="text-left py-1.5 px-3 text-dash-text-muted font-ui uppercase tracking-wider text-[10px] w-56" />
+                {MONTH_LABELS.map((l) => (
+                  <th key={l} className="text-right py-1.5 px-2 text-dash-text-muted font-ui uppercase tracking-wider text-[10px]">{l}-{String(year).slice(-2)}</th>
+                ))}
+                <th className="text-right py-1.5 px-3 text-dash-text-muted font-ui uppercase tracking-wider text-[10px]">YTD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Labor detail rows */}
+              {([
+                { label: "W-2 — Ops",     vals: monthly.map((m) => m.w2_ops) },
+                { label: "W-2 — R&D",     vals: monthly.map((m) => m.w2_rd) },
+                { label: "Sub — R&D",     vals: monthly.map((m) => m.sub_rd_contractors) },
+                { label: "Sub — 3Pillar", vals: monthly.map((m) => m.sub_3pillar) },
+                { label: "Sub — Testing", vals: monthly.map((m) => m.sub_testing) },
+              ] as const).map((row, i) => (
+                <tr key={row.label} className={i % 2 === 0 ? "" : "bg-dash-surface-raised/40"}>
+                  <td className="py-1.5 px-3 text-dash-text-secondary">{row.label}</td>
+                  {row.vals.map((v, j) => (
+                    <td key={j} className="py-1.5 px-2 text-right font-mono text-dash-text-secondary">
+                      {v ? formatCurrencyAccounting(v) : "—"}
+                    </td>
+                  ))}
+                  <td className="py-1.5 px-3 text-right font-mono text-dash-text-secondary">
+                    {formatCurrencyFull(row.vals.reduce((s, v) => s + v, 0))}
+                  </td>
+                </tr>
+              ))}
+              {/* Subtotal Labor */}
+              <tr className="border-t border-dash-border font-semibold">
+                <td className="py-2 px-3 text-dash-text">Subtotal Labor</td>
+                {monthly.map((m, i) => (
+                  <td key={i} className="py-2 px-2 text-right font-mono text-dash-text">
+                    {m.subtotal_labor ? formatCurrencyAccounting(m.subtotal_labor) : "—"}
+                  </td>
+                ))}
+                <td className="py-2 px-3 text-right font-mono text-dash-text">
+                  {formatCurrencyFull(monthly.reduce((s, m) => s + m.subtotal_labor, 0))}
+                </td>
+              </tr>
+              {/* PR Tax % */}
+              <tr className="border-t border-dash-border-divider">
+                <td className="py-1.5 px-3 text-dash-text-muted italic">PR Tax & Bene's %</td>
+                {monthly.map((m, i) => (
+                  <td key={i} className="py-1.5 px-2 text-right font-mono text-dash-text-muted">{formatPercent(m.tax_bene_rate)}</td>
+                ))}
+                <td className="py-1.5 px-3" />
+              </tr>
+              {/* Payroll Taxes & Benes */}
+              <tr className="border-t border-dash-border font-semibold">
+                <td className="py-2 px-3 text-dash-text">Payroll Taxes & Benes</td>
+                {monthly.map((m, i) => (
+                  <td key={i} className="py-2 px-2 text-right font-mono text-dash-text">
+                    {(m.w2_ops + m.w2_rd) * m.tax_bene_rate ? formatCurrencyAccounting((m.w2_ops + m.w2_rd) * m.tax_bene_rate) : "—"}
+                  </td>
+                ))}
+                <td className="py-2 px-3 text-right font-mono text-dash-text">
+                  {formatCurrencyFull(monthly.reduce((s, m) => s + (m.w2_ops + m.w2_rd) * m.tax_bene_rate, 0))}
+                </td>
+              </tr>
+              {/* Total Labor */}
+              <tr className="border-t border-dash-border font-semibold">
+                <td className="py-2 px-3 text-dash-text">Total Labor</td>
+                {monthly.map((m, i) => (
+                  <td key={i} className="py-2 px-2 text-right font-mono text-dash-text">
+                    {m.total_labor_sources ? formatCurrencyAccounting(m.total_labor_sources) : "—"}
+                  </td>
+                ))}
+                <td className="py-2 px-3 text-right font-mono text-dash-text">
+                  {formatCurrencyFull(monthly.reduce((s, m) => s + m.total_labor_sources, 0))}
+                </td>
+              </tr>
+              {/* Vendor Invoices sub-heading */}
+              <tr>
+                <td colSpan={14} className="pt-4 pb-1 px-1 text-[10px] font-ui font-semibold uppercase tracking-wider text-dash-text-secondary">
+                  Vendor Invoices
+                </td>
+              </tr>
+              {/* Vendor detail rows */}
+              {([
+                { label: "Innoscale", vals: monthly.map((m) => m.vendor_innoscale) },
+                { label: "Power BI",  vals: monthly.map((m) => m.vendor_powerbi) },
+              ] as const).map((row, i) => (
+                <tr key={row.label} className={i % 2 === 0 ? "" : "bg-dash-surface-raised/40"}>
+                  <td className="py-1.5 px-3 text-dash-text-secondary">{row.label}</td>
+                  {row.vals.map((v, j) => (
+                    <td key={j} className="py-1.5 px-2 text-right font-mono text-dash-text-secondary">
+                      {v ? formatCurrencyAccounting(v) : "—"}
+                    </td>
+                  ))}
+                  <td className="py-1.5 px-3 text-right font-mono text-dash-text-secondary">
+                    {formatCurrencyFull(row.vals.reduce((s, v) => s + v, 0))}
+                  </td>
+                </tr>
+              ))}
+              {/* Subtotal Vendor Invoices */}
+              <tr className="border-t border-dash-border font-semibold">
+                <td className="py-2 px-3 text-dash-text">Subtotal Vendor Invoices</td>
+                {monthly.map((m, i) => (
+                  <td key={i} className="py-2 px-2 text-right font-mono text-dash-text">
+                    {(m.vendor_innoscale + m.vendor_powerbi) ? formatCurrencyAccounting(m.vendor_innoscale + m.vendor_powerbi) : "—"}
+                  </td>
+                ))}
+                <td className="py-2 px-3 text-right font-mono text-dash-text">
+                  {formatCurrencyFull(monthly.reduce((s, m) => s + m.vendor_innoscale + m.vendor_powerbi, 0))}
+                </td>
+              </tr>
+              {/* Total Costs (CIP) */}
+              <tr className="border-t-2 border-dash-border font-semibold">
+                <td className="py-2 px-3 text-dash-text">Total Costs</td>
+                {monthly.map((m, i) => (
+                  <td key={i} className="py-2 px-2 text-right font-mono text-dash-text">
+                    {m.cip ? formatCurrencyAccounting(m.cip) : "—"}
+                  </td>
+                ))}
+                <td className="py-2 px-3 text-right font-mono text-dash-text">
+                  {formatCurrencyFull(monthly.reduce((s, m) => s + m.cip, 0))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </Section>
 
       <Section title="Journal Entry (incl. taxes & benes)">
