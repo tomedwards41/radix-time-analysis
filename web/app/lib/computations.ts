@@ -221,13 +221,13 @@ export function computeRadixRD(
     const cr_rd_subs  = sub_rd;
     const cr_3pillar  = sub_3pillar;
 
-    const vendor_innoscale = vendorTotal(invoices, "Radix R&D", year, month);
-    const vendor_powerbi   = invoices
-      .filter((v) => v.nc_bucket === "Radix R&D" && v.year === year && v.month === month && v.vendor === "Power BI")
-      .reduce((s, v) => s + v.amount, 0);
-    const innoscale_amt    = invoices
+    const innoscale_amt    = subtotal_labor > 0 ? invoices
       .filter((v) => v.nc_bucket === "Radix R&D" && v.year === year && v.month === month && v.vendor === "Innoscale")
-      .reduce((s, v) => s + v.amount, 0);
+      .reduce((s, v) => s + v.amount, 0) : 0;
+    const vendor_powerbi   = subtotal_labor > 0 ? invoices
+      .filter((v) => v.nc_bucket === "Radix R&D" && v.year === year && v.month === month && v.vendor === "Power BI")
+      .reduce((s, v) => s + v.amount, 0) : 0;
+    const vendor_innoscale = innoscale_amt;
 
     const cip = cr_rd_comp + cr_rd_subs + cr_3pillar;
     const total_cip = cip + innoscale_amt + vendor_powerbi;
@@ -299,12 +299,12 @@ export function computeEncRD(
 
     const total_labor_sources = rd_labor_grossed + sub_rd_contractors + sub_3pillar + sub_testing;
 
-    const innoscale_amt = invoices
+    const innoscale_amt = subtotal_labor > 0 ? invoices
       .filter((v) => v.nc_bucket === "Enc R&D" && v.year === year && v.month === month && v.vendor === "Innoscale")
-      .reduce((s, v) => s + v.amount, 0);
-    const powerbi_amt = invoices
+      .reduce((s, v) => s + v.amount, 0) : 0;
+    const powerbi_amt = subtotal_labor > 0 ? invoices
       .filter((v) => v.nc_bucket === "Enc R&D" && v.year === year && v.month === month && v.vendor === "Power BI")
-      .reduce((s, v) => s + v.amount, 0);
+      .reduce((s, v) => s + v.amount, 0) : 0;
 
     const cip = total_labor_sources + innoscale_amt + powerbi_amt;
     const intercompany_invoice = cip * 1.15;
@@ -366,13 +366,16 @@ export function computeStep1(
       maint += cost * a.maintenance;
     }
 
-    for (const inv of invoices.filter((v) => v.nc_bucket === "Enc R&D" && v.year === year && v.month === month)) {
-      const a = allocMap.get(inv.vendor);
-      if (!a) continue;
-      enc   += inv.amount * a.enc_platforms;
-      data  += inv.amount * a.data_platforms;
-      rbi   += inv.amount * a.reporting_bi;
-      maint += inv.amount * a.maintenance;
+    const hasLabor = (enc + data + rbi + maint) > 0;
+    if (hasLabor) {
+      for (const inv of invoices.filter((v) => v.nc_bucket === "Enc R&D" && v.year === year && v.month === month)) {
+        const a = allocMap.get(inv.vendor);
+        if (!a) continue;
+        enc   += inv.amount * a.enc_platforms;
+        data  += inv.amount * a.data_platforms;
+        rbi   += inv.amount * a.reporting_bi;
+        maint += inv.amount * a.maintenance;
+      }
     }
 
     enc *= 1.15; data *= 1.15; rbi *= 1.15; maint *= 1.15;
