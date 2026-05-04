@@ -1,4 +1,4 @@
-import type { TaxBeneRate, VendorInvoice, PersonDetail, RosterEntry, RateHistoryRow, MonthlyOverride } from "./types";
+import type { TaxBeneRate, VendorInvoice, PersonDetail, RosterEntry, RateHistoryRow, MonthlyOverride, RdAllocation, RdFeature, EncPlatformAllocation } from "./types";
 
 export const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -331,6 +331,92 @@ export function computeEncRD(
       total_hours,
     };
   });
+}
+
+// ── Interco R&D Invoice — Step 1 & Step 2 ────────────────────────────────────
+
+export interface BucketMonthData {
+  month: number;
+  enc_platforms: number;
+  data_platforms: number;
+  reporting_bi: number;
+  maintenance: number;
+  total: number;
+}
+
+// Step 1: split each person's (and vendor's) Enc R&D cost into 4 buckets × 1.15 markup
+export function computeStep1(
+  resolvedPersonRows: PersonDetail[],
+  allocations: RdAllocation[],
+  invoices: VendorInvoice[],
+  year: number
+): BucketMonthData[] {
+  const allocMap = new Map(allocations.map((a) => [a.name, a]));
+
+  return MONTHS.map((month) => {
+    let enc = 0, data = 0, rbi = 0, maint = 0;
+
+    for (const row of resolvedPersonRows.filter((r) => r.month === month && r.year === year)) {
+      const a = allocMap.get(row.staff_member);
+      if (!a) continue;
+      const cost = row.labor_cost ?? 0;
+      enc   += cost * a.enc_platforms;
+      data  += cost * a.data_platforms;
+      rbi   += cost * a.reporting_bi;
+      maint += cost * a.maintenance;
+    }
+
+    for (const inv of invoices.filter((v) => v.nc_bucket === "Enc R&D" && v.year === year && v.month === month)) {
+      const a = allocMap.get(inv.vendor);
+      if (!a) continue;
+      enc   += inv.amount * a.enc_platforms;
+      data  += inv.amount * a.data_platforms;
+      rbi   += inv.amount * a.reporting_bi;
+      maint += inv.amount * a.maintenance;
+    }
+
+    enc *= 1.15; data *= 1.15; rbi *= 1.15; maint *= 1.15;
+    return { month, enc_platforms: enc, data_platforms: data, reporting_bi: rbi, maintenance: maint, total: enc + data + rbi + maint };
+  });
+}
+
+export interface FeatureMonthData {
+  month: number;
+  feature_id: number;
+  feature_name: string;
+  bucket: string;
+  amount: number;
+}
+
+// Step 2: distribute each bucket total to individual features
+export function computeStep2(
+  step1: BucketMonthData[],
+  features: RdFeature[],
+  encAllocs: EncPlatformAllocation[],
+  year: number
+): FeatureMonthData[] {
+  const results: FeatureMonthData[] = [];
+
+  for (const md of step1) {
+    const { month } = md;
+
+    // enc_platforms: variable monthly allocation
+    for (const f of features.filter((f) => f.bucket === "enc_platforms")) {
+      const a = encAllocs.find((a) => a.feature_id === f.id && a.year === year && a.month === month);
+      if (!a || a.allocation_pct === 0) continue;
+      results.push({ month, feature_id: f.id, feature_name: f.name, bucket: "enc_platforms", amount: md.enc_platforms * a.allocation_pct });
+    }
+
+    // fixed-pct buckets
+    for (const bucket of ["data_platforms", "reporting_bi", "maintenance"] as const) {
+      const bucketTotal = md[bucket];
+      for (const f of features.filter((f) => f.bucket === bucket && f.fixed_pct != null && f.fixed_pct > 0)) {
+        results.push({ month, feature_id: f.id, feature_name: f.name, bucket, amount: bucketTotal * (f.fixed_pct ?? 0) });
+      }
+    }
+  }
+
+  return results;
 }
 
 // ── YTD helper ────────────────────────────────────────────────────────────────

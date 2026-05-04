@@ -6,5 +6,6 @@ export default [
   route("radix-rd", "routes/radix-rd.tsx"),
   route("enc-rd",   "routes/enc-rd.tsx"),
   route("upload",   "routes/upload.tsx"),
-  route("roster",   "routes/roster.tsx"),
+  route("roster",    "routes/roster.tsx"),
+  route("interco-rd", "routes/interco-rd.tsx"),
 ] satisfies RouteConfig;

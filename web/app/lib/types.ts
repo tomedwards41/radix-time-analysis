@@ -91,6 +91,34 @@ export interface PersonDetail {
   labor_cost: number;
 }
 
+// Interco R&D Invoice tables
+
+export interface RdAllocation {
+  name: string;
+  enc_platforms: number;
+  data_platforms: number;
+  reporting_bi: number;
+  maintenance: number;
+}
+
+export interface RdFeature {
+  id: number;
+  bucket: string;
+  name: string;
+  fixed_pct: number | null;
+  status: string;
+  placed_in_service_date: string | null;
+  placed_in_service_amount: number | null;
+  sort_order: number;
+}
+
+export interface EncPlatformAllocation {
+  feature_id: number;
+  year: number;
+  month: number;
+  allocation_pct: number;
+}
+
 // Journal entry line
 export interface JournalLine {
   account: string;

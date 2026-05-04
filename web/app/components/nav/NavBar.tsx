@@ -4,6 +4,7 @@ const NAV_ITEMS = [
   { to: "/ps",       label: "Professional Services" },
   { to: "/radix-rd", label: "Radix R&D"             },
   { to: "/enc-rd",   label: "enCompass R&D"         },
+  { to: "/interco-rd", label: "Interco R&D Invoice"  },
   { to: "/upload",   label: "Data Import"           },
   { to: "/roster",   label: "Roster"                },
 ];

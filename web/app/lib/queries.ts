@@ -1,6 +1,6 @@
 import type {
   TimeEntry, RosterEntry, TaxBeneRate, VendorInvoice, PersonDetail,
-  RateHistoryRow, MonthlyOverride,
+  RateHistoryRow, MonthlyOverride, RdAllocation, RdFeature, EncPlatformAllocation,
 } from "./types";
 
 type Stmt = {
@@ -219,6 +219,58 @@ export async function addRateHistoryEntry(
       ON CONFLICT(name, effective_date) DO UPDATE SET hourly_rate = excluded.hourly_rate
     `)
     .bind(name, effectiveDate, hourlyRate)
+    .run();
+}
+
+// ── Interco R&D Invoice ───────────────────────────────────────────────────────
+
+export async function getRdAllocations(db: DB): Promise<RdAllocation[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM person_rd_allocations ORDER BY name")
+    .all<RdAllocation>();
+  return results;
+}
+
+export async function upsertRdAllocation(db: DB, alloc: RdAllocation): Promise<void> {
+  await db
+    .prepare(`
+      INSERT INTO person_rd_allocations (name, enc_platforms, data_platforms, reporting_bi, maintenance)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(name) DO UPDATE SET
+        enc_platforms  = excluded.enc_platforms,
+        data_platforms = excluded.data_platforms,
+        reporting_bi   = excluded.reporting_bi,
+        maintenance    = excluded.maintenance
+    `)
+    .bind(alloc.name, alloc.enc_platforms, alloc.data_platforms, alloc.reporting_bi, alloc.maintenance)
+    .run();
+}
+
+export async function getRdFeatures(db: DB): Promise<RdFeature[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM rd_features ORDER BY bucket, sort_order")
+    .all<RdFeature>();
+  return results;
+}
+
+export async function getEncPlatformAllocations(db: DB, year: number): Promise<EncPlatformAllocation[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM enc_platform_allocations WHERE year = ? ORDER BY month, feature_id")
+    .bind(year)
+    .all<EncPlatformAllocation>();
+  return results;
+}
+
+export async function upsertEncPlatformAllocation(
+  db: DB, featureId: number, year: number, month: number, pct: number
+): Promise<void> {
+  await db
+    .prepare(`
+      INSERT INTO enc_platform_allocations (feature_id, year, month, allocation_pct)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(feature_id, year, month) DO UPDATE SET allocation_pct = excluded.allocation_pct
+    `)
+    .bind(featureId, year, month, pct)
     .run();
 }
 
