@@ -202,47 +202,47 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
         </div>
       </div>
 
-      {/* Step 1 Table */}
+      {/* Step 1 Table — categories as rows, months as columns */}
       <Section title="Step 1 — Bucket Allocation (with 15% Markup)">
         <div className="overflow-x-auto">
           <table className="w-auto min-w-full">
             <thead>
               <tr className="bg-dash-surface-raised">
-                <TH>Month</TH>
-                <TH right>enCompass Platforms</TH>
-                <TH right>Data Platforms</TH>
-                <TH right>Reporting / BI</TH>
-                <TH right>Maintenance</TH>
-                <TH right>Total</TH>
+                <TH>Category</TH>
+                {activeMonths.map((m) => (
+                  <TH key={m} right>{MONTH_LABELS[m - 1]}-{String(year).slice(-2)}</TH>
+                ))}
+                <TH right>YTD</TH>
               </tr>
             </thead>
             <tbody className="divide-y divide-dash-border-divider">
-              {step1.filter((m) => activeMonths.includes(m.month)).map((m) => (
-                <tr key={m.month} className="hover:bg-dash-surface-raised/50 transition-colors">
-                  <TD>{MONTH_LABELS[m.month - 1]}-{String(year).slice(-2)}</TD>
-                  <TD right>{formatCurrencyAccounting(m.enc_platforms)}</TD>
-                  <TD right>{formatCurrencyAccounting(m.data_platforms)}</TD>
-                  <TD right>{formatCurrencyAccounting(m.reporting_bi)}</TD>
-                  <TD right>{formatCurrencyAccounting(m.maintenance)}</TD>
-                  <TD right bold>{formatCurrencyAccounting(m.total)}</TD>
-                </tr>
-              ))}
-            </tbody>
-            {activeMonths.length > 1 && (
-              <tfoot>
-                <tr className="border-t-2 border-dash-border font-semibold">
-                  <TD bold>YTD</TD>
-                  {buckets.map((b) => (
-                    <TD key={b} right bold>
-                      {formatCurrencyAccounting(activeMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.[b] ?? 0), 0))}
+              {buckets.map((b) => (
+                <tr key={b} className="hover:bg-dash-surface-raised/50 transition-colors">
+                  <TD>{bucketLabels[b]}</TD>
+                  {activeMonths.map((m) => (
+                    <TD key={m} right>
+                      {formatCurrencyAccounting(step1.find((r) => r.month === m)?.[b] ?? 0)}
                     </TD>
                   ))}
                   <TD right bold>
-                    {formatCurrencyAccounting(activeMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.total ?? 0), 0))}
+                    {formatCurrencyAccounting(activeMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.[b] ?? 0), 0))}
                   </TD>
                 </tr>
-              </tfoot>
-            )}
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-dash-border">
+                <TD bold>Total</TD>
+                {activeMonths.map((m) => (
+                  <TD key={m} right bold>
+                    {formatCurrencyAccounting(step1.find((r) => r.month === m)?.total ?? 0)}
+                  </TD>
+                ))}
+                <TD right bold>
+                  {formatCurrencyAccounting(activeMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.total ?? 0), 0))}
+                </TD>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </Section>
