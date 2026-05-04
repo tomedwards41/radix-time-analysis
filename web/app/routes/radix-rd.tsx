@@ -128,9 +128,26 @@ export default function RadixRDRoute({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="p-4 space-y-4">
-      <div>
-        <h1 className="text-lg font-heading font-semibold text-dash-text">Radix R&D</h1>
-        <p className="text-xs text-dash-text-muted font-ui">Construction in Process — {year} · YTD through {MONTH_LABELS[(ytdMonth || 1) - 1]}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-heading font-semibold text-dash-text">Radix R&D</h1>
+          <p className="text-xs text-dash-text-muted font-ui">Construction in Process — {year} · YTD through {MONTH_LABELS[(ytdMonth || 1) - 1]}</p>
+        </div>
+        <button
+          onClick={async () => {
+            const { generateRadixRDExcel } = await import("~/lib/excel");
+            const data = generateRadixRDExcel(monthly, personRows, year);
+            const blob = new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = `RadixRD_${year}.xlsx`;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+          }}
+          className="flex-shrink-0 px-3 py-1.5 text-xs font-ui font-medium rounded border transition-colors bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20"
+        >
+          ↓ Export to Excel
+        </button>
       </div>
 
       <div className="flex gap-2.5 flex-wrap">
