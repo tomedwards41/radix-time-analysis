@@ -148,7 +148,19 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
         <MetricCard title="YTD COS"        value={formatCurrencyFull(ytdCOS)}   />
         <MetricCard title="YTD W-2 Labor"  value={formatCurrencyFull(ytdW2)}    subtitle="incl. taxes & benes" />
         <MetricCard title="YTD Subs"       value={formatCurrencyFull(ytdSubs)}  />
-        <MetricCard title="YTD Hours"      value={formatHours(ytdHours)}        subtitle="chargeable" />
+        <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
+          <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">YTD Hours</p>
+          <div className="flex flex-col gap-0.5 flex-1 justify-center">
+            <div>
+              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">{formatHours(ytdW2Hours)}</p>
+              <p className="text-[10px] text-dash-text-muted">W-2</p>
+            </div>
+            <div className="mt-1">
+              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">{formatHours(ytdSubHours)}</p>
+              <p className="text-[10px] text-dash-text-muted">Contractors</p>
+            </div>
+          </div>
+        </div>
         {/* Cost per hour card */}
         <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
           <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">Cost per Hour</p>
