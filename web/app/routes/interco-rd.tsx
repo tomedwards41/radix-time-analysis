@@ -98,14 +98,14 @@ const TD = ({ children, right, bold, muted }: { children: React.ReactNode; right
 // Fixed colgroup used by every table so month columns align across sections
 const TableCols = () => (
   <colgroup>
-    <col style={{ width: 190 }} />
+    <col style={{ width: 270 }} />
     {MONTHS.map((m) => <col key={m} style={{ width: 80 }} />)}
     <col style={{ width: 90 }} />
   </colgroup>
 );
 
-// 190 + 80×12 + 90 = 1240 — exact width forces table-layout:fixed to honour colgroup
-const TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width: 1240 };
+// 270 + 80×12 + 90 = 1320 — exact width forces table-layout:fixed to honour colgroup
+const TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width: 1320 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
