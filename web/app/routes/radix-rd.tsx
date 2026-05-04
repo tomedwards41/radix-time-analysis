@@ -10,7 +10,6 @@ import { computeRadixRD, sumField, resolvePersonCosts, aggregateToCategories, MO
 import {
   formatCurrencyFull, formatCurrencyAccounting, formatPercent, formatHours, MONTH_LABELS,
 } from "~/lib/formatters";
-import MetricCard from "~/components/ui/MetricCard";
 import ChartWrapper from "~/components/charts/ChartWrapper";
 import { CHART_COLORS, CHART_DEFAULTS } from "~/lib/echarts-theme";
 import type { EChartsOption } from "echarts";
@@ -46,11 +45,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export default function RadixRDRoute({ loaderData }: Route.ComponentProps) {
   const { monthly, personRows, year, ytdMonth } = loaderData;
 
-  const activeMonths = monthly.filter((m) => m.total_cip > 0);
-  const ytdCIP     = sumField(activeMonths, "total_cip");
-  const ytdHours   = sumField(activeMonths, "total_hours");
-  const ytdW2      = sumField(activeMonths, "cr_rd_comp");
-  const ytdVendors = sumField(activeMonths, "cr_innoscale") + sumField(activeMonths, "cr_powerbi");
+  const activeMonths    = monthly.filter((m) => m.total_cip > 0);
+  const activeMonthNums = new Set(activeMonths.map((m) => m.month));
+  const ytdW2           = sumField(activeMonths, "cr_rd_comp");
+  const ytdSubs         = sumField(activeMonths, "cr_rd_subs") + sumField(activeMonths, "cr_3pillar");
+
+  const ytdW2Hours     = personRows.filter((r) => r.emp_type === "W-2" && activeMonthNums.has(r.month)).reduce((s, r) => s + (r.hours ?? 0), 0);
+  const ytdSubHours    = personRows.filter((r) => r.emp_type !== "W-2" && activeMonthNums.has(r.month)).reduce((s, r) => s + (r.hours ?? 0), 0);
+  const ytdTotalHours  = ytdW2Hours + ytdSubHours;
+  const w2PerHour      = ytdW2Hours    > 0 ? ytdW2  / ytdW2Hours    : null;
+  const subPerHour     = ytdSubHours   > 0 ? ytdSubs / ytdSubHours   : null;
+  const blendedPerHour = ytdTotalHours > 0 ? (ytdW2 + ytdSubs) / ytdTotalHours : null;
 
   const chartOption: EChartsOption = {
     ...CHART_DEFAULTS,
@@ -129,10 +134,60 @@ export default function RadixRDRoute({ loaderData }: Route.ComponentProps) {
       </div>
 
       <div className="flex gap-2.5 flex-wrap">
-        <MetricCard title="YTD CIP"       value={formatCurrencyFull(ytdCIP)}     />
-        <MetricCard title="YTD W-2 R&D"  value={formatCurrencyFull(ytdW2)}      subtitle="incl. taxes & benes" />
-        <MetricCard title="YTD Vendors"   value={formatCurrencyFull(ytdVendors)} subtitle="Innoscale + Power BI" />
-        <MetricCard title="YTD Hours"     value={formatHours(ytdHours)}          subtitle="R&D allocated" />
+        {/* YTD Labor Cost */}
+        <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
+          <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">YTD Labor Cost</p>
+          <div className="flex flex-col flex-1 justify-center">
+            <div>
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{formatCurrencyFull(ytdW2)}</p>
+              <p className="text-[10px] text-dash-text-muted">W-2 incl. T&amp;B</p>
+            </div>
+            <div className="mt-0.5">
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{formatCurrencyFull(ytdSubs)}</p>
+              <p className="text-[10px] text-dash-text-muted">Contractors</p>
+            </div>
+            <div className="mt-1 pt-1 border-t border-dash-border">
+              <p className="text-[15px] font-heading font-semibold text-dash-accent leading-tight">{formatCurrencyFull(ytdW2 + ytdSubs)}</p>
+              <p className="text-[10px] text-dash-text-muted">Total</p>
+            </div>
+          </div>
+        </div>
+        {/* YTD Hours */}
+        <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
+          <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">YTD Hours</p>
+          <div className="flex flex-col flex-1 justify-center">
+            <div>
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{formatHours(ytdW2Hours)}</p>
+              <p className="text-[10px] text-dash-text-muted">W-2</p>
+            </div>
+            <div className="mt-0.5">
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{formatHours(ytdSubHours)}</p>
+              <p className="text-[10px] text-dash-text-muted">Contractors</p>
+            </div>
+            <div className="mt-1 pt-1 border-t border-dash-border">
+              <p className="text-[15px] font-heading font-semibold text-dash-accent leading-tight">{formatHours(ytdTotalHours)}</p>
+              <p className="text-[10px] text-dash-text-muted">Total</p>
+            </div>
+          </div>
+        </div>
+        {/* Cost per Hour */}
+        <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
+          <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">Cost per Hour</p>
+          <div className="flex flex-col flex-1 justify-center">
+            <div>
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{w2PerHour != null ? formatCurrencyFull(w2PerHour) : "—"}</p>
+              <p className="text-[10px] text-dash-text-muted">W-2 incl. T&amp;B</p>
+            </div>
+            <div className="mt-0.5">
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{subPerHour != null ? formatCurrencyFull(subPerHour) : "—"}</p>
+              <p className="text-[10px] text-dash-text-muted">Contractors</p>
+            </div>
+            <div className="mt-1 pt-1 border-t border-dash-border">
+              <p className="text-[15px] font-heading font-semibold text-dash-accent leading-tight">{blendedPerHour != null ? formatCurrencyFull(blendedPerHour) : "—"}</p>
+              <p className="text-[10px] text-dash-text-muted">Blended</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <ChartWrapper option={chartOption} height={260} />
