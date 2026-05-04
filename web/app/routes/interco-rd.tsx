@@ -107,10 +107,16 @@ const TableCols = () => (
 // 270 + 80×12 + 90 = 1320 — exact width forces table-layout:fixed to honour colgroup
 const TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width: 1320 };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, variant = "primary" }: { title: string; children: React.ReactNode; variant?: "primary" | "secondary" }) {
+  const wrap = variant === "secondary"
+    ? "bg-dash-nav-bg rounded-lg border border-dash-accent-muted"
+    : "bg-dash-surface rounded-lg border border-dash-border";
+  const head = variant === "secondary"
+    ? "px-4 py-2.5 border-b border-dash-accent-muted bg-dash-surface rounded-t-lg"
+    : "px-4 py-2.5 border-b border-dash-border bg-dash-surface-raised rounded-t-lg";
   return (
-    <div className="bg-dash-surface rounded-lg border border-dash-border">
-      <div className="px-4 py-2.5 border-b border-dash-border bg-dash-surface-raised rounded-t-lg">
+    <div className={wrap}>
+      <div className={head}>
         <h2 className="text-[11px] font-ui font-semibold text-dash-text-secondary uppercase tracking-widest">{title}</h2>
       </div>
       {children}
@@ -271,7 +277,7 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
           const bucketYTD  = ytdMonths.reduce((s, m) => s + bucketVal(m), 0);
 
           return (
-            <Section key={bucket} title={bucketLabels[bucket]}>
+            <Section key={bucket} title={bucketLabels[bucket]} variant="secondary">
               <table style={TABLE_STYLE}>
                 <TableCols />
                 <thead>
