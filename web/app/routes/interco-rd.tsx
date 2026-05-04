@@ -11,10 +11,10 @@ import {
 } from "~/lib/queries";
 import {
   resolvePersonCosts, aggregateToCategories,
-  computeEncRD, computeStep1, computeStep2, sumField, MONTHS,
+  computeEncRD, computeStep1, computeStep2, MONTHS,
 } from "~/lib/computations";
 import { formatCurrencyFull, formatCurrencyAccounting, MONTH_LABELS } from "~/lib/formatters";
-import type { RdAllocation, RdFeature, EncPlatformAllocation } from "~/lib/types";
+import type { RdAllocation, EncPlatformAllocation } from "~/lib/types";
 
 export function meta() {
   return [{ title: "Interco R&D Invoice | Labor Analysis" }];
@@ -95,10 +95,21 @@ const TD = ({ children, right, bold, muted }: { children: React.ReactNode; right
   </td>
 );
 
+// Fixed colgroup used by every table so month columns align across sections
+const TableCols = () => (
+  <colgroup>
+    <col style={{ width: 190 }} />
+    {MONTHS.map((m) => <col key={m} style={{ width: 80 }} />)}
+    <col style={{ width: 90 }} />
+  </colgroup>
+);
+
+const TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", minWidth: 1230 };
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-dash-surface rounded-lg border border-dash-border overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-dash-border bg-dash-surface-raised">
+    <div className="bg-dash-surface rounded-lg border border-dash-border">
+      <div className="px-4 py-2.5 border-b border-dash-border bg-dash-surface-raised rounded-t-lg">
         <h2 className="text-[11px] font-ui font-semibold text-dash-text-secondary uppercase tracking-widest">{title}</h2>
       </div>
       {children}
@@ -111,7 +122,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
   const { step1, step2, features, allocations, encAllocs, year, ytdMonth } = loaderData;
 
-  const activeMonths = step1.filter((m) => m.total > 0).map((m) => m.month);
+  // ytdMonths = months that have actual data (for YTD sums / KPI cards)
+  const ytdMonths = step1.filter((m) => m.total > 0).map((m) => m.month);
 
   // Step 2 grouped by bucket
   const bucketLabels: Record<string, string> = {
@@ -123,15 +135,11 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
 
   const buckets = ["enc_platforms", "data_platforms", "reporting_bi", "maintenance"] as const;
 
-  // Feature rows per bucket
-  const featuresByBucket = (bucket: string) =>
-    features.filter((f) => f.bucket === bucket && (f.fixed_pct ?? 0) > 0 || (f.bucket === bucket && f.bucket === "enc_platforms" && step2.some((r) => r.bucket === bucket && r.feature_id === f.id)));
-
   const step2Amount = (featureId: number, month: number) =>
     step2.find((r) => r.feature_id === featureId && r.month === month)?.amount ?? 0;
 
   const step2YTD = (featureId: number) =>
-    activeMonths.reduce((s, m) => s + step2Amount(featureId, m), 0);
+    ytdMonths.reduce((s, m) => s + step2Amount(featureId, m), 0);
 
   // ── Admin panel state ──────────────────────────────────────────────────────
 
@@ -159,8 +167,8 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
 
   const encFeatures = features.filter((f) => f.bucket === "enc_platforms" && f.status === "Active");
 
-  // Months to show in enc admin (active months)
-  const adminMonths = activeMonths.length > 0 ? activeMonths : [1, 2, 3];
+  // Months to show in enc admin — months that have labor data
+  const adminMonths = ytdMonths.length > 0 ? ytdMonths : [1, 2, 3];
 
   // Totals per month for enc admin
   const encMonthTotal = (month: number) => {
@@ -184,7 +192,7 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
       {/* Step 1 KPI cards */}
       <div className="flex gap-2.5 flex-wrap">
         {buckets.map((b) => {
-          const ytd = activeMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.[b] ?? 0), 0);
+          const ytd = ytdMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.[b] ?? 0), 0);
           return (
             <div key={b} className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
               <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">{bucketLabels[b]}</p>
@@ -196,76 +204,79 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
         <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
           <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">Total Invoice</p>
           <p className="text-[20px] font-heading font-semibold text-dash-accent leading-tight">
-            {formatCurrencyFull(activeMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.total ?? 0), 0))}
+            {formatCurrencyFull(ytdMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.total ?? 0), 0))}
           </p>
           <p className="text-[10px] text-dash-text-muted">YTD incl. 15% markup</p>
         </div>
       </div>
 
-      {/* Step 1 Table — categories as rows, months as columns */}
-      <Section title="Step 1 — Bucket Allocation (with 15% Markup)">
-        <div className="overflow-x-auto">
-          <table className="w-auto min-w-full">
+      {/* All data tables share one scroll container so month columns align */}
+      <div className="overflow-x-auto space-y-4">
+
+        {/* Step 1 — categories as rows, all 12 months as columns */}
+        <Section title="Step 1 — Bucket Allocation (with 15% Markup)">
+          <table style={TABLE_STYLE}>
+            <TableCols />
             <thead>
               <tr className="bg-dash-surface-raised">
                 <TH>Category</TH>
-                {activeMonths.map((m) => (
+                {MONTHS.map((m) => (
                   <TH key={m} right>{MONTH_LABELS[m - 1]}-{String(year).slice(-2)}</TH>
                 ))}
                 <TH right>YTD</TH>
               </tr>
             </thead>
             <tbody className="divide-y divide-dash-border-divider">
-              {buckets.map((b) => (
-                <tr key={b} className="hover:bg-dash-surface-raised/50 transition-colors">
-                  <TD>{bucketLabels[b]}</TD>
-                  {activeMonths.map((m) => (
-                    <TD key={m} right>
-                      {formatCurrencyAccounting(step1.find((r) => r.month === m)?.[b] ?? 0)}
-                    </TD>
-                  ))}
-                  <TD right bold>
-                    {formatCurrencyAccounting(activeMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.[b] ?? 0), 0))}
-                  </TD>
-                </tr>
-              ))}
+              {buckets.map((b) => {
+                const rowYTD = ytdMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.[b] ?? 0), 0);
+                return (
+                  <tr key={b} className="hover:bg-dash-surface-raised/50 transition-colors">
+                    <TD>{bucketLabels[b]}</TD>
+                    {MONTHS.map((m) => {
+                      const val = step1.find((r) => r.month === m)?.[b] ?? 0;
+                      return (
+                        <TD key={m} right muted={val === 0}>{val === 0 ? "—" : formatCurrencyAccounting(val)}</TD>
+                      );
+                    })}
+                    <TD right bold>{formatCurrencyAccounting(rowYTD)}</TD>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-dash-border">
                 <TD bold>Total</TD>
-                {activeMonths.map((m) => (
-                  <TD key={m} right bold>
-                    {formatCurrencyAccounting(step1.find((r) => r.month === m)?.total ?? 0)}
-                  </TD>
-                ))}
+                {MONTHS.map((m) => {
+                  const val = step1.find((r) => r.month === m)?.total ?? 0;
+                  return <TD key={m} right bold muted={val === 0}>{val === 0 ? "—" : formatCurrencyAccounting(val)}</TD>;
+                })}
                 <TD right bold>
-                  {formatCurrencyAccounting(activeMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.total ?? 0), 0))}
+                  {formatCurrencyAccounting(ytdMonths.reduce((s, m) => s + (step1.find((r) => r.month === m)?.total ?? 0), 0))}
                 </TD>
               </tr>
             </tfoot>
           </table>
-        </div>
-      </Section>
+        </Section>
 
-      {/* Step 2 Tables — one per bucket */}
-      {buckets.map((bucket) => {
-        const bucketFeatures = bucket === "enc_platforms"
-          ? features.filter((f) => f.bucket === "enc_platforms" && step2.some((r) => r.bucket === "enc_platforms" && r.feature_id === f.id))
-          : features.filter((f) => f.bucket === bucket && f.fixed_pct != null && f.fixed_pct > 0);
+        {/* Step 2 — one section per bucket */}
+        {buckets.map((bucket) => {
+          const bucketFeatures = bucket === "enc_platforms"
+            ? features.filter((f) => f.bucket === "enc_platforms" && step2.some((r) => r.bucket === "enc_platforms" && r.feature_id === f.id))
+            : features.filter((f) => f.bucket === bucket && f.fixed_pct != null && f.fixed_pct > 0);
 
-        if (bucketFeatures.length === 0) return null;
+          if (bucketFeatures.length === 0) return null;
 
-        const bucketTotal = (month: number) => step1.find((r) => r.month === month)?.[bucket] ?? 0;
-        const bucketYTD   = activeMonths.reduce((s, m) => s + bucketTotal(m), 0);
+          const bucketVal  = (month: number) => step1.find((r) => r.month === month)?.[bucket] ?? 0;
+          const bucketYTD  = ytdMonths.reduce((s, m) => s + bucketVal(m), 0);
 
-        return (
-          <Section key={bucket} title={`Step 2 — ${bucketLabels[bucket]}`}>
-            <div className="overflow-x-auto">
-              <table className="w-auto min-w-full">
+          return (
+            <Section key={bucket} title={`Step 2 — ${bucketLabels[bucket]}`}>
+              <table style={TABLE_STYLE}>
+                <TableCols />
                 <thead>
                   <tr className="bg-dash-surface-raised">
                     <TH>Feature</TH>
-                    {activeMonths.map((m) => (
+                    {MONTHS.map((m) => (
                       <TH key={m} right>{MONTH_LABELS[m - 1]}-{String(year).slice(-2)}</TH>
                     ))}
                     <TH right>YTD</TH>
@@ -275,31 +286,32 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
                   {bucketFeatures.map((f) => (
                     <tr key={f.id} className="hover:bg-dash-surface-raised/50 transition-colors">
                       <TD>{f.name}</TD>
-                      {activeMonths.map((m) => (
-                        <TD key={m} right muted={step2Amount(f.id, m) === 0}>
-                          {step2Amount(f.id, m) === 0 ? "—" : formatCurrencyAccounting(step2Amount(f.id, m))}
-                        </TD>
-                      ))}
-                      <TD right bold>{formatCurrencyAccounting(step2YTD(f.id))}</TD>
+                      {MONTHS.map((m) => {
+                        const val = step2Amount(f.id, m);
+                        return (
+                          <TD key={m} right muted={val === 0}>{val === 0 ? "—" : formatCurrencyAccounting(val)}</TD>
+                        );
+                      })}
+                      <TD right bold>{step2YTD(f.id) === 0 ? "—" : formatCurrencyAccounting(step2YTD(f.id))}</TD>
                     </tr>
                   ))}
                 </tbody>
-                {activeMonths.length > 0 && (
-                  <tfoot>
-                    <tr className="border-t-2 border-dash-border">
-                      <TD bold>Total {bucketLabels[bucket]}</TD>
-                      {activeMonths.map((m) => (
-                        <TD key={m} right bold>{formatCurrencyAccounting(bucketTotal(m))}</TD>
-                      ))}
-                      <TD right bold>{formatCurrencyAccounting(bucketYTD)}</TD>
-                    </tr>
-                  </tfoot>
-                )}
+                <tfoot>
+                  <tr className="border-t-2 border-dash-border">
+                    <TD bold>Total {bucketLabels[bucket]}</TD>
+                    {MONTHS.map((m) => {
+                      const val = bucketVal(m);
+                      return <TD key={m} right bold muted={val === 0}>{val === 0 ? "—" : formatCurrencyAccounting(val)}</TD>;
+                    })}
+                    <TD right bold>{bucketYTD === 0 ? "—" : formatCurrencyAccounting(bucketYTD)}</TD>
+                  </tr>
+                </tfoot>
               </table>
-            </div>
-          </Section>
-        );
-      })}
+            </Section>
+          );
+        })}
+
+      </div>{/* end shared scroll container */}
 
       {/* Admin: enCompass Platform Monthly Allocations */}
       <div className="bg-dash-surface rounded-lg border border-dash-border overflow-hidden">
