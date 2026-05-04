@@ -172,7 +172,7 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
   const [encEdits, setEncEdits] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     for (const a of encAllocs) {
-      init[`${a.feature_id}:${a.month}`] = String(Math.round(a.allocation_pct * 1000) / 10);
+      init[`${a.feature_id}:${a.month}`] = (a.allocation_pct * 100).toFixed(1);
     }
     return init;
   });
@@ -477,16 +477,23 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
                         <td className="py-1.5 px-3 text-xs font-ui text-dash-text whitespace-nowrap">{f.name}</td>
                         {MONTHS.map((m) => (
                           <td key={m} className="py-1 px-1">
-                            <input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max="100"
-                              value={encEdits[`${f.id}:${m}`] ?? ""}
-                              placeholder="0"
-                              onChange={(e) => setEncEdits((prev) => ({ ...prev, [`${f.id}:${m}`]: e.target.value }))}
-                              className="w-14 bg-dash-surface-raised border border-dash-border rounded px-1.5 py-0.5 text-xs font-ui text-dash-text text-right focus:outline-none focus:border-dash-accent"
-                            />
+                            <div className="flex items-center gap-0.5">
+                              <input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="100"
+                                value={encEdits[`${f.id}:${m}`] ?? ""}
+                                placeholder="0.0"
+                                onChange={(e) => setEncEdits((prev) => ({ ...prev, [`${f.id}:${m}`]: e.target.value }))}
+                                onBlur={(e) => {
+                                  const n = parseFloat(e.target.value) || 0;
+                                  setEncEdits((prev) => ({ ...prev, [`${f.id}:${m}`]: n.toFixed(1) }));
+                                }}
+                                className="w-14 bg-dash-surface-raised border border-dash-border rounded px-1.5 py-0.5 text-xs font-ui text-dash-text text-right focus:outline-none focus:border-dash-accent"
+                              />
+                              <span className="text-[10px] text-dash-text-muted">%</span>
+                            </div>
                           </td>
                         ))}
                       </tr>
@@ -501,7 +508,7 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
                         const color = total === 0 ? "text-dash-text-muted" : valid ? "text-dash-positive" : "text-dash-warning";
                         return (
                           <td key={m} className={`py-1.5 px-1 text-center text-xs font-ui font-semibold tabular-nums ${color}`}>
-                            {total === 0 ? "—" : `${total.toFixed(0)}%`}
+                            {total === 0 ? "—" : `${total.toFixed(1)}%`}
                           </td>
                         );
                       })}
