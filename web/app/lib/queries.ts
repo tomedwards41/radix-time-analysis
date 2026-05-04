@@ -295,6 +295,34 @@ export async function upsertRdFeature(
   }
 }
 
+// Enc R&D staff in time_entries this year who have no person_rd_allocations row
+export async function getEncRDStaffMissingAllocations(db: DB, year: number): Promise<string[]> {
+  const { results } = await db
+    .prepare(`
+      SELECT DISTINCT te.staff_member
+      FROM time_entries te
+      WHERE te.nc_mapped = 'Enc R&D' AND te.year = ?
+        AND te.staff_member NOT IN (SELECT name FROM person_rd_allocations)
+      ORDER BY te.staff_member
+    `)
+    .bind(year)
+    .all<{ staff_member: string }>();
+  return results.map((r) => r.staff_member);
+}
+
+// Staff in any time_entries who have no roster entry
+export async function getUnrosteredStaff(db: DB): Promise<string[]> {
+  const { results } = await db
+    .prepare(`
+      SELECT DISTINCT staff_member
+      FROM time_entries
+      WHERE staff_member NOT IN (SELECT name FROM roster)
+      ORDER BY staff_member
+    `)
+    .all<{ staff_member: string }>();
+  return results.map((r) => r.staff_member);
+}
+
 // Row count per NC bucket for the upload page summary
 export async function getImportSummary(db: DB): Promise<{ nc_mapped: string; year: number; month: number; row_count: number; total_hours: number; total_cost: number }[]> {
   const { results } = await db

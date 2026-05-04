@@ -8,6 +8,8 @@ import {
   getRateHistory, getAllMonthlyOverridesForYear,
   getRdAllocations, getRdFeatures, getEncPlatformAllocations,
   upsertRdAllocation, upsertEncPlatformAllocation, upsertRdFeature,
+  upsertRosterPerson,
+  getEncRDStaffMissingAllocations, getUnrosteredStaff,
 } from "~/lib/queries";
 import {
   resolvePersonCosts, aggregateToCategories,
@@ -27,7 +29,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const years = await getAvailableYears(env.DB);
   const year  = years[0] ?? 2026;
 
-  const [personRaw, rates, invoices, roster, rateHistory, overrides, allocations, features, encAllocs] =
+  const [personRaw, rates, invoices, roster, rateHistory, overrides, allocations, features, encAllocs, missingEncRDAllocs, unrosteredStaff] =
     await Promise.all([
       getPersonDetail(env.DB, "Enc R&D", year),
       getTaxBeneRates(env.DB, year),
@@ -38,6 +40,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       getRdAllocations(env.DB),
       getRdFeatures(env.DB),
       getEncPlatformAllocations(env.DB, year),
+      getEncRDStaffMissingAllocations(env.DB, year),
+      getUnrosteredStaff(env.DB),
     ]);
 
   const personRows  = resolvePersonCosts(personRaw, roster, rateHistory, overrides, "Enc R&D");
@@ -48,7 +52,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const ytdMonth = Math.max(...encMonthly.filter((m) => m.cip > 0).map((m) => m.month), 0);
 
-  return { step1, step2, features, allocations, encAllocs, year, ytdMonth };
+  return { step1, step2, features, allocations, encAllocs, roster, year, ytdMonth, missingEncRDAllocs, unrosteredStaff };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -85,6 +89,41 @@ export async function action({ request, context }: Route.ActionArgs) {
       maintenance:    Number(form.get("maintenance")),
     };
     await upsertRdAllocation(env.DB, alloc);
+  }
+
+  // Like save_person_alloc but values submitted as % (0-100) — used by new add/setup forms
+  if (intent === "save_person_alloc_pct") {
+    await upsertRdAllocation(env.DB, {
+      name:           form.get("name") as string,
+      enc_platforms:  (parseFloat(form.get("enc_platforms") as string) || 0) / 100,
+      data_platforms: (parseFloat(form.get("data_platforms") as string) || 0) / 100,
+      reporting_bi:   (parseFloat(form.get("reporting_bi")   as string) || 0) / 100,
+      maintenance:    (parseFloat(form.get("maintenance")    as string) || 0) / 100,
+    });
+  }
+
+  if (intent === "save_full_person_setup") {
+    const name          = form.get("name") as string;
+    const primaryBucket = (form.get("primary_nc_bucket") as string) || null;
+    await upsertRosterPerson(env.DB, {
+      name,
+      emp_type:          (form.get("emp_type")      as string) || "Employee",
+      dept:              (form.get("dept")           as string) || "",
+      company:           (form.get("company")        as string) || "",
+      sub_category:      (form.get("sub_category")   as string) || null,
+      default_alloc:     (form.get("default_alloc")  as string) || "100%",
+      primary_nc_bucket: primaryBucket,
+      hourly_rate:       form.get("hourly_rate") ? Number(form.get("hourly_rate")) : null,
+    });
+    if (primaryBucket === "Enc R&D") {
+      await upsertRdAllocation(env.DB, {
+        name,
+        enc_platforms:  (parseFloat(form.get("enc_platforms") as string) || 0) / 100,
+        data_platforms: (parseFloat(form.get("data_platforms") as string) || 0) / 100,
+        reporting_bi:   (parseFloat(form.get("reporting_bi")   as string) || 0) / 100,
+        maintenance:    (parseFloat(form.get("maintenance")    as string) || 0) / 100,
+      });
+    }
   }
 
   return redirect("/interco-rd");
@@ -136,7 +175,7 @@ function Section({ title, children, variant = "primary" }: { title: string; chil
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
-  const { step1, step2, features, allocations, encAllocs, year, ytdMonth } = loaderData;
+  const { step1, step2, features, allocations, encAllocs, roster, year, ytdMonth, missingEncRDAllocs, unrosteredStaff } = loaderData;
 
   // ytdMonths = months that have actual data (for YTD sums / KPI cards)
   const ytdMonths = step1.filter((m) => m.total > 0).map((m) => m.month);
@@ -190,6 +229,36 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
   });
 
   const encFeatures = features.filter((f) => f.bucket === "enc_platforms" && f.status === "Active");
+
+  // ── Setup-required state ───────────────────────────────────────────────────
+
+  const rosterNames      = new Set(roster.map((r) => r.name));
+  const missingInRoster  = missingEncRDAllocs.filter((n) =>  rosterNames.has(n));
+  const missingNotInRoster = missingEncRDAllocs.filter((n) => !rosterNames.has(n));
+  const otherUnrostered  = unrosteredStaff.filter((n) => !missingEncRDAllocs.includes(n));
+  const totalSetupNeeded = missingEncRDAllocs.length + otherUnrostered.length;
+
+  const [showSetupPanel, setShowSetupPanel] = useState(true);
+
+  const allocFields = ["enc_platforms", "data_platforms", "reporting_bi", "maintenance"] as const;
+
+  const [missingAllocEdits, setMissingAllocEdits] = useState<Record<string, Record<string, string>>>(() =>
+    Object.fromEntries(missingEncRDAllocs.map((name) => [name, { enc_platforms: "0.0", data_platforms: "0.0", reporting_bi: "0.0", maintenance: "0.0" }]))
+  );
+
+  const [fullSetupEdits, setFullSetupEdits] = useState<Record<string, Record<string, string>>>(() =>
+    Object.fromEntries(
+      missingNotInRoster.map((name) => [name, {
+        emp_type: "Employee", dept: "", company: "",
+        sub_category: "", default_alloc: "100%", primary_nc_bucket: "Enc R&D", hourly_rate: "",
+      }])
+    )
+  );
+
+  const [addPersonName, setAddPersonName]     = useState("");
+  const [addPersonAllocs, setAddPersonAllocs] = useState<Record<string, string>>({
+    enc_platforms: "0.0", data_platforms: "0.0", reporting_bi: "0.0", maintenance: "0.0",
+  });
 
   // Months to show in enc admin — months that have labor data
   const adminMonths = ytdMonths.length > 0 ? ytdMonths : [1, 2, 3];
@@ -337,6 +406,201 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
         })}
 
       </div>{/* end shared scroll container */}
+
+      {/* Setup Required — flagged people needing configuration */}
+      {totalSetupNeeded > 0 && (
+        <div className="bg-dash-surface rounded-lg border border-dash-warning/40 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowSetupPanel((v) => !v)}
+            className="w-full px-4 py-2.5 border-b border-dash-warning/40 bg-dash-warning/5 flex items-center justify-between hover:bg-dash-warning/10 transition-colors"
+          >
+            <h2 className="text-[11px] font-ui font-semibold text-dash-warning uppercase tracking-widest">
+              ⚠ Setup Required — {totalSetupNeeded} {totalSetupNeeded === 1 ? "person needs" : "people need"} configuration
+            </h2>
+            <span className="text-[10px] text-dash-text-muted">{showSetupPanel ? "▲ Collapse" : "▼ Expand"}</span>
+          </button>
+          {showSetupPanel && (
+            <div className="p-4 space-y-6">
+
+              {/* Not in roster at all — full setup */}
+              {missingNotInRoster.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-[11px] font-ui font-semibold text-dash-text-secondary uppercase tracking-wide">
+                    Enc R&D Staff — Not in Roster (complete setup required)
+                  </p>
+                  {missingNotInRoster.map((name) => {
+                    const edits    = fullSetupEdits[name] ?? {};
+                    const bucket   = edits.primary_nc_bucket ?? "Enc R&D";
+                    const setEdit  = (k: string, v: string) => setFullSetupEdits((p) => ({ ...p, [name]: { ...p[name], [k]: v } }));
+                    const setAlloc = (k: string, v: string) => setMissingAllocEdits((p) => ({ ...p, [name]: { ...p[name], [k]: v } }));
+                    const allocTotal = allocFields.reduce((s, k) => s + (parseFloat(missingAllocEdits[name]?.[k] ?? "0") || 0), 0);
+                    const allocValid = Math.abs(allocTotal - 100) < 0.1;
+                    return (
+                      <div key={name} className="border border-dash-warning/20 rounded-lg p-3 space-y-3">
+                        <p className="text-xs font-ui font-semibold text-dash-text">{name}</p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                          {([
+                            ["Type",         "emp_type",          "select",  ["Employee","Contract"]],
+                            ["Company",      "company",           "text",    null],
+                            ["Dept",         "dept",              "text",    null],
+                            ["Sub-Category", "sub_category",      "text",    null],
+                            ["Default Alloc","default_alloc",     "text",    null],
+                            ["Hourly Rate",  "hourly_rate",       "number",  null],
+                          ] as [string, string, string, string[] | null][]).map(([label, field, type, opts]) => (
+                            <div key={field} className="flex flex-col gap-0.5">
+                              <label className="text-[10px] font-ui text-dash-text-muted uppercase">{label}</label>
+                              {type === "select" ? (
+                                <select
+                                  value={edits[field] ?? "Employee"}
+                                  onChange={(e) => setEdit(field, e.target.value)}
+                                  className="bg-dash-surface-raised border border-dash-border rounded px-2 py-0.5 text-xs font-ui text-dash-text focus:outline-none focus:border-dash-accent"
+                                >
+                                  {opts!.map((o) => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                              ) : (
+                                <input
+                                  type={type}
+                                  step={type === "number" ? "0.01" : undefined}
+                                  value={edits[field] ?? ""}
+                                  onChange={(e) => setEdit(field, e.target.value)}
+                                  className="bg-dash-surface-raised border border-dash-border rounded px-2 py-0.5 text-xs font-ui text-dash-text focus:outline-none focus:border-dash-accent"
+                                />
+                              )}
+                            </div>
+                          ))}
+                          <div className="flex flex-col gap-0.5">
+                            <label className="text-[10px] font-ui text-dash-text-muted uppercase">Primary NC Bucket</label>
+                            <select
+                              value={bucket}
+                              onChange={(e) => setEdit("primary_nc_bucket", e.target.value)}
+                              className="bg-dash-surface-raised border border-dash-border rounded px-2 py-0.5 text-xs font-ui text-dash-text focus:outline-none focus:border-dash-accent"
+                            >
+                              <option value="Enc R&D">Enc R&D</option>
+                              <option value="PS">PS</option>
+                              <option value="Radix R&D">Radix R&D</option>
+                              <option value="Internal">Internal</option>
+                              <option value="">— None —</option>
+                            </select>
+                          </div>
+                        </div>
+                        {bucket === "Enc R&D" && (
+                          <div className="border-t border-dash-border/50 pt-2 space-y-1">
+                            <p className="text-[10px] font-ui text-dash-text-muted uppercase tracking-wide">Bucket Allocations</p>
+                            <div className="flex items-center gap-4 flex-wrap">
+                              {allocFields.map((field) => (
+                                <div key={field} className="flex items-center gap-1">
+                                  <label className="text-[10px] text-dash-text-muted">{bucketLabels[field]}</label>
+                                  <input
+                                    type="number" step="0.1" min="0" max="100"
+                                    value={missingAllocEdits[name]?.[field] ?? "0.0"}
+                                    onChange={(e) => setAlloc(field, e.target.value)}
+                                    onBlur={(e) => setAlloc(field, (parseFloat(e.target.value) || 0).toFixed(1))}
+                                    className="w-14 bg-dash-surface-raised border border-dash-border rounded px-1.5 py-0.5 text-xs font-ui text-dash-text text-right focus:outline-none focus:border-dash-accent"
+                                  />
+                                  <span className="text-[10px] text-dash-text-muted">%</span>
+                                </div>
+                              ))}
+                              <span className={`text-xs font-ui font-semibold ${allocValid ? "text-dash-positive" : "text-dash-warning"}`}>
+                                Total: {allocTotal.toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        <form method="post">
+                          <input type="hidden" name="intent"            value="save_full_person_setup" />
+                          <input type="hidden" name="name"              value={name} />
+                          <input type="hidden" name="emp_type"          value={edits.emp_type          ?? "Employee"} />
+                          <input type="hidden" name="dept"              value={edits.dept              ?? ""} />
+                          <input type="hidden" name="company"           value={edits.company           ?? ""} />
+                          <input type="hidden" name="sub_category"      value={edits.sub_category      ?? ""} />
+                          <input type="hidden" name="default_alloc"     value={edits.default_alloc     ?? "100%"} />
+                          <input type="hidden" name="primary_nc_bucket" value={bucket} />
+                          <input type="hidden" name="hourly_rate"       value={edits.hourly_rate       ?? ""} />
+                          {bucket === "Enc R&D" && allocFields.map((f) => (
+                            <input key={f} type="hidden" name={f} value={missingAllocEdits[name]?.[f] ?? "0"} />
+                          ))}
+                          <button type="submit" className="px-3 py-1 text-xs font-ui font-medium rounded border transition-colors bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20">
+                            Save &amp; Add to Roster
+                          </button>
+                        </form>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* In roster, but missing allocations */}
+              {missingInRoster.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-[11px] font-ui font-semibold text-dash-text-secondary uppercase tracking-wide">
+                    Enc R&D Staff — Missing Bucket Allocations
+                  </p>
+                  {missingInRoster.map((name) => {
+                    const setAlloc   = (k: string, v: string) => setMissingAllocEdits((p) => ({ ...p, [name]: { ...p[name], [k]: v } }));
+                    const allocTotal = allocFields.reduce((s, k) => s + (parseFloat(missingAllocEdits[name]?.[k] ?? "0") || 0), 0);
+                    const allocValid = Math.abs(allocTotal - 100) < 0.1;
+                    return (
+                      <div key={name} className="border border-dash-warning/20 rounded-lg p-3 space-y-2">
+                        <p className="text-xs font-ui font-semibold text-dash-text">{name}</p>
+                        <div className="flex items-center gap-4 flex-wrap">
+                          {allocFields.map((field) => (
+                            <div key={field} className="flex items-center gap-1">
+                              <label className="text-[10px] text-dash-text-muted">{bucketLabels[field]}</label>
+                              <input
+                                type="number" step="0.1" min="0" max="100"
+                                value={missingAllocEdits[name]?.[field] ?? "0.0"}
+                                onChange={(e) => setAlloc(field, e.target.value)}
+                                onBlur={(e) => setAlloc(field, (parseFloat(e.target.value) || 0).toFixed(1))}
+                                className="w-14 bg-dash-surface-raised border border-dash-border rounded px-1.5 py-0.5 text-xs font-ui text-dash-text text-right focus:outline-none focus:border-dash-accent"
+                              />
+                              <span className="text-[10px] text-dash-text-muted">%</span>
+                            </div>
+                          ))}
+                          <span className={`text-xs font-ui font-semibold ${allocValid ? "text-dash-positive" : "text-dash-warning"}`}>
+                            Total: {allocTotal.toFixed(1)}%
+                          </span>
+                        </div>
+                        <form method="post">
+                          <input type="hidden" name="intent"        value="save_person_alloc_pct" />
+                          <input type="hidden" name="name"          value={name} />
+                          {allocFields.map((f) => (
+                            <input key={f} type="hidden" name={f} value={missingAllocEdits[name]?.[f] ?? "0"} />
+                          ))}
+                          <button type="submit" disabled={!allocValid} className="px-3 py-1 text-xs font-ui font-medium rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20">
+                            Save Allocations
+                          </button>
+                        </form>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Other unrostered (not Enc R&D) */}
+              {otherUnrostered.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-ui font-semibold text-dash-text-secondary uppercase tracking-wide mb-2">
+                    Other Staff — Not in Roster
+                  </p>
+                  <p className="text-xs text-dash-text-muted font-ui mb-2">
+                    These people appear in time entries but are not in the roster. Add them on the{" "}
+                    <a href="/roster" className="text-dash-accent hover:underline">Roster page</a>.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {otherUnrostered.map((name) => (
+                      <span key={name} className="px-2 py-0.5 text-xs font-ui text-dash-warning bg-dash-warning/10 border border-dash-warning/20 rounded">
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Admin: enCompass Platform Features */}
       <div className="bg-dash-surface rounded-lg border border-dash-border overflow-hidden">
@@ -540,7 +804,8 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
           <span className="text-[10px] text-dash-text-muted">{showPersonAdmin ? "▲ Collapse" : "▼ Expand"}</span>
         </button>
         {showPersonAdmin && (
-          <div className="overflow-x-auto">
+          <div>
+            <div className="overflow-x-auto">
             <table className="w-auto min-w-full">
               <thead>
                 <tr className="bg-dash-surface-raised">
@@ -599,6 +864,60 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
                 })}
               </tbody>
             </table>
+            </div>
+            {/* Add Person */}
+            <div className="border-t border-dash-border p-4 space-y-3">
+              <p className="text-[11px] font-ui font-semibold text-dash-text-secondary uppercase tracking-wide">Add Person</p>
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-ui text-dash-text-muted w-12">Name</label>
+                <input
+                  type="text"
+                  list="add-person-candidates"
+                  value={addPersonName}
+                  onChange={(e) => setAddPersonName(e.target.value)}
+                  placeholder="Enter name…"
+                  className="w-64 bg-dash-surface-raised border border-dash-border rounded px-2 py-0.5 text-xs font-ui text-dash-text focus:outline-none focus:border-dash-accent"
+                />
+                <datalist id="add-person-candidates">
+                  {roster
+                    .filter((r) => r.primary_nc_bucket === "Enc R&D" && !allocations.some((a) => a.name === r.name))
+                    .map((r) => <option key={r.name} value={r.name} />)}
+                </datalist>
+              </div>
+              <div className="flex items-center gap-4 flex-wrap">
+                {allocFields.map((field) => (
+                  <div key={field} className="flex items-center gap-1">
+                    <label className="text-[10px] text-dash-text-muted">{bucketLabels[field]}</label>
+                    <input
+                      type="number" step="0.1" min="0" max="100"
+                      value={addPersonAllocs[field] ?? "0.0"}
+                      onChange={(e) => setAddPersonAllocs((p) => ({ ...p, [field]: e.target.value }))}
+                      onBlur={(e) => setAddPersonAllocs((p) => ({ ...p, [field]: (parseFloat(e.target.value) || 0).toFixed(1) }))}
+                      className="w-14 bg-dash-surface-raised border border-dash-border rounded px-1.5 py-0.5 text-xs font-ui text-dash-text text-right focus:outline-none focus:border-dash-accent"
+                    />
+                    <span className="text-[10px] text-dash-text-muted">%</span>
+                  </div>
+                ))}
+                {(() => {
+                  const total = allocFields.reduce((s, k) => s + (parseFloat(addPersonAllocs[k] ?? "0") || 0), 0);
+                  return <span className={`text-xs font-ui font-semibold ${Math.abs(total - 100) < 0.1 ? "text-dash-positive" : "text-dash-warning"}`}>Total: {total.toFixed(1)}%</span>;
+                })()}
+              </div>
+              <form method="post">
+                <input type="hidden" name="intent" value="save_person_alloc_pct" />
+                <input type="hidden" name="name"   value={addPersonName} />
+                {allocFields.map((f) => (
+                  <input key={f} type="hidden" name={f} value={addPersonAllocs[f] ?? "0"} />
+                ))}
+                <button
+                  type="submit"
+                  disabled={!addPersonName.trim()}
+                  className="px-3 py-1 text-xs font-ui font-medium rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-dash-accent/10 text-dash-accent border-dash-accent/30 hover:bg-dash-accent/20"
+                >
+                  Add Person
+                </button>
+              </form>
+            </div>
           </div>
         )}
       </div>
