@@ -104,7 +104,8 @@ const TableCols = () => (
   </colgroup>
 );
 
-const TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", minWidth: 1230 };
+// 190 + 80×12 + 90 = 1240 — exact width forces table-layout:fixed to honour colgroup
+const TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width: 1240 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -211,7 +212,7 @@ export default function IntercoRDRoute({ loaderData }: Route.ComponentProps) {
       </div>
 
       {/* All data tables share one scroll container so month columns align */}
-      <div className="overflow-x-auto space-y-4">
+      <div className="overflow-x-auto space-y-4" style={{ minWidth: 0 }}>
 
         {/* Step 1 — categories as rows, all 12 months as columns */}
         <Section title="Step 1 — Bucket Allocation (with 15% Markup)">
