@@ -94,7 +94,7 @@ export default function RosterRoute({ loaderData }: Route.ComponentProps) {
           <span className="text-[11px] text-dash-text-muted font-ui">Click a name to view rate history</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
+          <table className="w-auto text-xs border-collapse">
             <thead>
               <tr className="border-b border-dash-border bg-dash-surface-raised">
                 <TH>Name</TH>
