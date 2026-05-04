@@ -13,7 +13,6 @@ import {
 import {
   formatCurrencyFull, formatCurrencyAccounting, formatPercent, formatHours, MONTH_LABELS,
 } from "~/lib/formatters";
-import MetricCard from "~/components/ui/MetricCard";
 import ChartWrapper from "~/components/charts/ChartWrapper";
 import { CHART_COLORS, CHART_DEFAULTS } from "~/lib/echarts-theme";
 import type { EChartsOption } from "echarts";
@@ -51,15 +50,15 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
 
   const activeMonths = monthly.filter((m) => m.total_cos > 0);
   const activeMonthNums = new Set(activeMonths.map((m) => m.month));
-  const ytdCOS    = sumField(activeMonths, "total_cos");
-  const ytdHours  = sumField(activeMonths, "total_hours");
-  const ytdW2     = sumField(activeMonths, "cos_labor");
-  const ytdSubs   = sumField(activeMonths, "cos_subs");
+  const ytdW2   = sumField(activeMonths, "cos_labor");
+  const ytdSubs = sumField(activeMonths, "cos_subs");
 
-  const ytdW2Hours  = personRows.filter((r) => r.emp_type === "W-2"  && activeMonthNums.has(r.month)).reduce((s, r) => s + (r.hours ?? 0), 0);
-  const ytdSubHours = personRows.filter((r) => r.emp_type === "Sub"  && activeMonthNums.has(r.month)).reduce((s, r) => s + (r.hours ?? 0), 0);
-  const w2PerHour   = ytdW2Hours  > 0 ? ytdW2  / ytdW2Hours  : null;
-  const subPerHour  = ytdSubHours > 0 ? ytdSubs / ytdSubHours : null;
+  const ytdW2Hours    = personRows.filter((r) => r.emp_type === "W-2"  && activeMonthNums.has(r.month)).reduce((s, r) => s + (r.hours ?? 0), 0);
+  const ytdSubHours   = personRows.filter((r) => r.emp_type === "Sub"  && activeMonthNums.has(r.month)).reduce((s, r) => s + (r.hours ?? 0), 0);
+  const ytdTotalHours = ytdW2Hours + ytdSubHours;
+  const w2PerHour      = ytdW2Hours      > 0 ? ytdW2  / ytdW2Hours      : null;
+  const subPerHour     = ytdSubHours     > 0 ? ytdSubs / ytdSubHours     : null;
+  const blendedPerHour = ytdTotalHours   > 0 ? (ytdW2 + ytdSubs) / ytdTotalHours : null;
 
   // Chart: monthly COS split W-2 vs Subs
   const chartOption: EChartsOption = {
@@ -145,48 +144,63 @@ export default function PSRoute({ loaderData }: Route.ComponentProps) {
 
       {/* KPI row */}
       <div className="flex gap-2.5 flex-wrap">
-        <MetricCard title="YTD COS"        value={formatCurrencyFull(ytdCOS)}   />
+        {/* YTD Labor Cost */}
         <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
           <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">YTD Labor Cost</p>
-          <div className="flex flex-col gap-0.5 flex-1 justify-center">
+          <div className="flex flex-col flex-1 justify-center">
             <div>
-              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">{formatCurrencyFull(ytdW2)}</p>
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{formatCurrencyFull(ytdW2)}</p>
               <p className="text-[10px] text-dash-text-muted">W-2 incl. T&amp;B</p>
             </div>
-            <div className="mt-1">
-              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">{formatCurrencyFull(ytdSubs)}</p>
+            <div className="mt-0.5">
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{formatCurrencyFull(ytdSubs)}</p>
               <p className="text-[10px] text-dash-text-muted">Contractors</p>
+            </div>
+            <div className="mt-1 pt-1 border-t border-dash-border">
+              <p className="text-[15px] font-heading font-semibold text-dash-accent leading-tight">{formatCurrencyFull(ytdW2 + ytdSubs)}</p>
+              <p className="text-[10px] text-dash-text-muted">Total</p>
             </div>
           </div>
         </div>
+        {/* YTD Hours */}
         <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
           <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">YTD Hours</p>
-          <div className="flex flex-col gap-0.5 flex-1 justify-center">
+          <div className="flex flex-col flex-1 justify-center">
             <div>
-              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">{formatHours(ytdW2Hours)}</p>
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{formatHours(ytdW2Hours)}</p>
               <p className="text-[10px] text-dash-text-muted">W-2</p>
             </div>
-            <div className="mt-1">
-              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">{formatHours(ytdSubHours)}</p>
+            <div className="mt-0.5">
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">{formatHours(ytdSubHours)}</p>
               <p className="text-[10px] text-dash-text-muted">Contractors</p>
+            </div>
+            <div className="mt-1 pt-1 border-t border-dash-border">
+              <p className="text-[15px] font-heading font-semibold text-dash-accent leading-tight">{formatHours(ytdTotalHours)}</p>
+              <p className="text-[10px] text-dash-text-muted">Total</p>
             </div>
           </div>
         </div>
-        {/* Cost per hour card */}
+        {/* Cost per Hour */}
         <div className="bg-dash-surface rounded-lg border border-dash-border p-3.5 flex flex-col gap-1 min-w-[140px] flex-1 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-white/20 cursor-default">
           <p className="text-[10px] font-ui font-medium text-dash-text-secondary uppercase tracking-[0.12em]">Cost per Hour</p>
-          <div className="flex flex-col gap-0.5 flex-1 justify-center">
+          <div className="flex flex-col flex-1 justify-center">
             <div>
-              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">
                 {w2PerHour != null ? formatCurrencyFull(w2PerHour) : "—"}
               </p>
               <p className="text-[10px] text-dash-text-muted">W-2 incl. T&amp;B</p>
             </div>
-            <div className="mt-1">
-              <p className="text-[17px] font-heading font-semibold text-dash-text leading-tight">
+            <div className="mt-0.5">
+              <p className="text-[15px] font-heading font-semibold text-dash-text leading-tight">
                 {subPerHour != null ? formatCurrencyFull(subPerHour) : "—"}
               </p>
               <p className="text-[10px] text-dash-text-muted">Contractors</p>
+            </div>
+            <div className="mt-1 pt-1 border-t border-dash-border">
+              <p className="text-[15px] font-heading font-semibold text-dash-accent leading-tight">
+                {blendedPerHour != null ? formatCurrencyFull(blendedPerHour) : "—"}
+              </p>
+              <p className="text-[10px] text-dash-text-muted">Blended</p>
             </div>
           </div>
         </div>
